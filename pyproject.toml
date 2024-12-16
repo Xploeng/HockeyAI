@@ -4,10 +4,17 @@ version = "0.1.0"
 description = ""
 authors = ["Xploeng <julius@harald-rau.de>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
+gymnasium = "^1.0.0"
+hockey = {git = "https://github.com/martius-lab/hockey-env.git", develop = true}
+numpy = "^2.2.0"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]
