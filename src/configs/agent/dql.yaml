@@ -1,0 +1,6 @@
+# type: DQL Agent
+_target_: agents.DeepQLearning
+name: DQL
+eps_start: 0.9
+eps_end: 0.05
+eps_decay: 1000

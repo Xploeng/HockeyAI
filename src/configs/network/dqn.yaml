@@ -1,0 +1,2 @@
+_target_: utils.DQN
+hidden_size: 128
