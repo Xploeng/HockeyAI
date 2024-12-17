@@ -22,6 +22,7 @@ def run_training(cfg):
     plt.ion()
 
     env = gym.make(cfg.env)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
 
     n_actions = env.action_space.n
     state, info = env.reset()
@@ -62,6 +63,7 @@ def run_training(cfg):
         n_actions=n_actions,
         n_observations=n_oberservations,
         policy_net=policy_net,
+        target_net=target_net,
         optimizer=optimizer,
         criterion=criterion,
         memory=memory,

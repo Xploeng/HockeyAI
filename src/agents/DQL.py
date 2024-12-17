@@ -24,6 +24,7 @@ class DeepQLearning(Agent):
     def __init__(
         self,
         policy_net,
+        target_net,
         memory,
         env,
         optimizer,
@@ -36,6 +37,7 @@ class DeepQLearning(Agent):
     ):
         super().__init__()
         self.policy_net = policy_net
+        self.target_net = target_net
         self.memory = memory
         self.env = env
         self.optimizer = optimizer
@@ -46,6 +48,7 @@ class DeepQLearning(Agent):
         self.eps_decay = eps_decay
 
         self.steps_done = 0
+        self.losses = []
 
     def select_action(self, state):
         sample = random.random()
@@ -92,7 +95,7 @@ class DeepQLearning(Agent):
         next_state_values = torch.zeros(batch_size, device=self.device)
         with torch.no_grad():
             next_state_values[non_final_mask] = (
-                self.policy_net(non_final_next_states).max(1).values
+                self.target_net(non_final_next_states).max(1).values
             )
 
         expected_state_action_values = (next_state_values * gamma) + reward_batch
@@ -101,6 +104,8 @@ class DeepQLearning(Agent):
             state_action_values,
             expected_state_action_values.unsqueeze(1),
         )
+
+        self.losses.append(loss.item())
 
         self.optimizer.zero_grad()
         loss.backward()
