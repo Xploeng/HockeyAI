@@ -1,6 +1,9 @@
 # latex stuff
 *.pdf
 
+# ignore outputs
+src/outputs/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
