@@ -9,12 +9,13 @@ import numpy as np
 import torch
 import torch.utils.tensorboard as tb
 
+from gymnasium import spaces
 from tqdm import tqdm
 
 
 sys.path.append("src/")
-from agents import *  # noqa: F403
-from utils import *  # noqa: F403
+from agents import Agent
+from utils import DiscreteActionWrapper, ReplayMemory, write_checkpoint
 
 
 @hydra.main(config_path="../configs/", config_name="config", version_base=None)
@@ -23,9 +24,16 @@ def run_training(cfg):
     env = gym.make(cfg.env)
     env = gym.wrappers.RecordEpisodeStatistics(env)
 
-    n_actions = env.action_space.n
-    state, info = env.reset()
-    n_oberservations = len(state)
+    if isinstance(env.action_space, spaces.Box):
+        n_actions = cfg.bins
+        env = DiscreteActionWrapper(env, bins=cfg.bins)
+    elif isinstance(env.action_space, spaces.Discrete):
+        n_actions = env.action_space.n
+    if isinstance(env.observation_space, spaces.Box):
+        n_oberservations = env.observation_space.shape[0]
+    else:
+        state, info = env.reset()
+        n_oberservations = len(state)
 
     if cfg.seed:
         np.random.seed(cfg.seed)
@@ -142,13 +150,20 @@ def run_training(cfg):
                 scalar_value=loss,
                 global_step=agent.steps_done,
             )
-    # Write checkpoint to file, using a separate thread
-    if cfg.training.save_agent:
-        thread = threading.Thread(
-            target=write_checkpoint,
-            args=(agent, optimizer, episode, checkpoint_path),
-        )
-        thread.start()
+        # Write checkpoint to file, using a separate thread
+        if cfg.training.save_agent and episode % cfg.training.save_interval == 0:
+            thread = threading.Thread(
+                target=write_checkpoint,
+                args=(agent, optimizer, episode, checkpoint_path),
+            )
+            thread.start()
+    try:
+        thread.join()
+        writer.flush()
+        writer.close()
+        env.close()
+    except NameError:
+        pass
 
 
 if __name__ == "__main__":

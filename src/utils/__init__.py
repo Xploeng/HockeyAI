@@ -1,3 +1,3 @@
 from .replay import ReplayMemory
 from .networks import DQN
-from .helper import write_checkpoint
+from .helper import write_checkpoint, DiscreteActionWrapper
