@@ -9,6 +9,7 @@ defaults:
 
 device: cuda:0
 seed: 1234
+verbose : True
 env: CartPole-v1
 bins: 0
 
