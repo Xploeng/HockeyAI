@@ -10,9 +10,7 @@ defaults:
 device : cuda:0
 seed: 1234
 env: CartPole-v1
-memory: 
 
 hydra:
-  verbose: False
   run:
     dir: src/outputs/${agent.name}/

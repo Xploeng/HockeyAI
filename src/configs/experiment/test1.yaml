@@ -15,3 +15,5 @@ network:
 training:
   episodes: 600
   batch_size: 128
+  save_agent: True
+  continue_training: True

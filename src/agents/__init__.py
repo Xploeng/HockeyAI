@@ -1,1 +1,1 @@
-from .DQL import DeepQLearning
+from .DQL import DeepQLearning, Agent
