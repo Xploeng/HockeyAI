@@ -7,9 +7,10 @@ defaults:
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
-device : cuda:0
+device: cuda:0
 seed: 1234
 env: CartPole-v1
+bins: 0
 
 hydra:
   run:
