@@ -79,8 +79,7 @@ def run_training(cfg):
     )
     if cfg.training.continue_training:
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        agent.load_state_dict(checkpoint["agent_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        agent.load_state_dict(**checkpoint)
         episode = checkpoint["episode"]
     else:
         episode = 0
@@ -94,12 +93,19 @@ def run_training(cfg):
     )
 
     # training loop
-    for i in tqdm(range(episode, cfg.training.episodes)):
+    print("Starting training")
+    print(f"Training from {episode} to {cfg.training.episodes} episodes")
+    for episode in tqdm(range(episode, cfg.training.episodes)):
         # Track the episode number and learning rate
-        writer.add_scalar(tag="Episode", scalar_value=i)
+        writer.add_scalar(
+            tag="Episode",
+            scalar_value=episode,
+            global_step=agent.steps_done,
+        )
         writer.add_scalar(
             tag="Learning Rate",
             scalar_value=optimizer.state_dict()["param_groups"][0]["lr"],
+            global_step=agent.steps_done,
         )
 
         # Initialize the environment and get its state
@@ -131,7 +137,11 @@ def run_training(cfg):
             agent.optimize(**cfg.training)
 
             loss = agent.losses[-1] if len(agent.losses) > 0 else 0
-            writer.add_scalar(tag="Loss", scalar_value=loss)
+            writer.add_scalar(
+                tag="Loss",
+                scalar_value=loss,
+                global_step=agent.steps_done,
+            )
     # Write checkpoint to file, using a separate thread
     if cfg.training.save_agent:
         thread = threading.Thread(

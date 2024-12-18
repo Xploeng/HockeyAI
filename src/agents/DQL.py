@@ -115,12 +115,19 @@ class DeepQLearning(Agent):
             ] * tau + target_net_state_dict[key] * (1 - tau)
         self.target_net.load_state_dict(target_net_state_dict)
 
-    def load_state_dict(self, torch_state_dict):
-        self.policy_net.load_state_dict(torch_state_dict["network_state_dict"])
-        self.target_net.load_state_dict(torch_state_dict["network_state_dict"])
-        self.optimizer.load_state_dict(torch_state_dict["optimizer_state_dict"])
-        self.memory = torch_state_dict["memory"]
-        self.steps_done = torch_state_dict["episode"]
+    def load_state_dict(
+        self,
+        agent_state_dict,
+        optimizer_state_dict=None,
+        episode=None,
+        **_,
+    ):
+        self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
+        self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
+        self.memory = agent_state_dict["memory"]
+        if optimizer_state_dict is not None:
+            self.optimizer.load_state_dict(optimizer_state_dict)
+        self.steps_done = len(self.memory)
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(

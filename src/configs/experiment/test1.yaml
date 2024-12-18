@@ -13,5 +13,7 @@ network:
   hidden_size: 128
 
 training:
-  episodes: 200
+  episodes: 600
   batch_size: 128
+  save_agent: True
+  continue_training: True
