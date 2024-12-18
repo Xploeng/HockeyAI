@@ -1,23 +1,14 @@
+import collections
 import math
 import random
 import sys
-
-from abc import ABC, abstractmethod
 import torch
+
+from .agent import Agent
 
 
 sys.path.append("src/")
 from utils.replay import Transition
-
-
-class Agent(ABC):
-    @abstractmethod
-    def select_action(self, state):
-        raise NotImplementedError
-
-    @abstractmethod
-    def optimize(self):
-        raise NotImplementedError
 
 
 class DeepQLearning(Agent):
@@ -47,8 +38,8 @@ class DeepQLearning(Agent):
         self.eps_end = eps_end
         self.eps_decay = eps_decay
 
-        self.steps_done = 0
-        self.losses = []
+    def record(self, state, action, next_state, reward, done):
+        self.memory.push(state, action, next_state, reward, done)
 
     def select_action(self, state):
         sample = random.random()
@@ -66,7 +57,7 @@ class DeepQLearning(Agent):
                 dtype=torch.long,
             )
 
-    def optimize(self, batch_size, gamma, **_):
+    def optimize(self, batch_size, gamma, tau, **_):
         if len(self.memory) < batch_size:
             return
         transitions = self.memory.sample(batch_size)
@@ -112,3 +103,26 @@ class DeepQLearning(Agent):
 
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 100)
         self.optimizer.step()
+
+        self.update_target(tau=tau)
+
+    def update_target(self, tau):
+        target_net_state_dict = self.target_net.state_dict()
+        policy_net_state_dict = self.policy_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[
+                key
+            ] * tau + target_net_state_dict[key] * (1 - tau)
+        self.target_net.load_state_dict(target_net_state_dict)
+
+    def load_state_dict(self, torch_state_dict):
+        self.policy_net.load_state_dict(torch_state_dict["network_state_dict"])
+        self.target_net.load_state_dict(torch_state_dict["network_state_dict"])
+        self.optimizer.load_state_dict(torch_state_dict["optimizer_state_dict"])
+        self.memory = torch_state_dict["memory"]
+        self.steps_done = torch_state_dict["episode"]
+
+    def state_dict(self) -> collections.OrderedDict:
+        return collections.OrderedDict(
+            {"network_state_dict": self.policy_net.state_dict(), "memory": self.memory},
+        )

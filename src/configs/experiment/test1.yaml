@@ -13,5 +13,5 @@ network:
   hidden_size: 128
 
 training:
-  episodes: 600
+  episodes: 200
   batch_size: 128

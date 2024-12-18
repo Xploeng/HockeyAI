@@ -13,6 +13,8 @@ hockey = {git = "https://github.com/martius-lab/hockey-env.git", develop = true}
 numpy = "^2.2.0"
 hydra-core = "^1.3.2"
 matplotlib = "^3.10.0"
+tensorboard = "^2.18.0"
+tqdm = "^4.67.1"
 
 
 [tool.poetry.group.dev.dependencies]
