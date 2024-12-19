@@ -15,6 +15,7 @@ from gymnasium import spaces
 from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
 from matplotlib.animation import PillowWriter
 from omegaconf import DictConfig
+from PIL import Image
 from tqdm import tqdm
 
 
@@ -39,10 +40,14 @@ def evaluate_model(cfg: DictConfig) -> None:
         print("\n\nInitialize environment and model")
         print(f"\nDevice: {device}")
 
+    # Directory for saving animations
+    animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
+    os.makedirs(animation_dir, exist_ok=True)
+
     # Initialize the environment
     # video_folder = os.path.join("src/outputs", cfg.agent.name, "videos")
     # os.makedirs(video_folder, exist_ok=True)
-    env = gym.make(cfg.env) # , render_mode="rgb_array")
+    env = gym.make(cfg.env, render_mode="rgb_array")
     # env = RecordVideo(env, video_folder=video_folder, name_prefix="eval")
     env = RecordEpisodeStatistics(env)
 
@@ -95,7 +100,12 @@ def evaluate_model(cfg: DictConfig) -> None:
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         done = False
         rewards = []
+        frames = []
+
         while not done:
+            frame = env.render()
+            frames.append(Image.fromarray(frame))
+
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, info = env.step(action.item())
             rewards.append(reward)
@@ -110,6 +120,17 @@ def evaluate_model(cfg: DictConfig) -> None:
                     stats = info["episode"]
                     stats["rewards"] = rewards
                     episode_stats.update({episode:stats})
+
+        # Save the frames as a GIF
+        gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
+        frames[0].save(
+            gif_path,
+            save_all=True,
+            append_images=frames[1:],
+            duration=50,  # Duration between frames in milliseconds
+            loop=0,  # Infinite loop
+        )
+        print(f"Episode {episode} animation saved as {gif_path}")
 
     # Save episode statistics
     episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
