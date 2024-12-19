@@ -1,4 +1,6 @@
 import os
+
+from copy import deepcopy
 import gymnasium as gym
 import torch
 

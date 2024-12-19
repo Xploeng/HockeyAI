@@ -14,16 +14,16 @@ from utils.replay import Transition
 class DeepQLearning(Agent):
     def __init__(
         self,
-        policy_net,
-        target_net,
-        memory,
         env,
-        optimizer,
-        criterion,
-        device,
-        eps_start,
-        eps_end,
-        eps_decay,
+        memory,
+        policy_net,
+        target_net = None,
+        optimizer = None,
+        criterion = None,
+        device = "cuda:0",
+        eps_start = 0.9,
+        eps_end = 0.05,
+        eps_decay = 1000,
         **_,
     ):
         super().__init__()
@@ -122,12 +122,15 @@ class DeepQLearning(Agent):
         episode=None,
         **_,
     ):
+        if self.target_net is not None:
+            self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
+
         self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
-        self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
+
         self.memory = agent_state_dict["memory"]
-        if optimizer_state_dict is not None:
-            self.optimizer.load_state_dict(optimizer_state_dict)
         self.steps_done = len(self.memory)
+        if self.optimizer is not None and optimizer_state_dict is not None:
+            self.optimizer.load_state_dict(optimizer_state_dict)
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(

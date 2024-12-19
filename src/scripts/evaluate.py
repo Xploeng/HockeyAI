@@ -1,6 +1,7 @@
 #! bin/env/python3
 
 import argparse
+import glob
 import json
 import os
 import sys
@@ -8,69 +9,107 @@ import gymnasium as gym
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
+import torch
 
+from gymnasium import spaces
+from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
 from matplotlib.animation import PillowWriter
 from omegaconf import DictConfig
 from tqdm import tqdm
 
 
 sys.path.append("src/")
-from agents import *  # noqa: E402, F403, I001
-from utils import *  # noqa: E402, F403, I001
+from agents import Agent  # noqa: E402, F403, I001
+from utils import DiscreteActionWrapper, ReplayMemory  # noqa: E402, F403, I001
 
 
 def evaluate_model(cfg: DictConfig) -> None:
     """
     Evaluates a single model for a given configuration.
 
-    :param cfg: The hydra configuration of the model
-    :param file_path: The destination path for the resulting plots
-    """
+    Args:
+        cfg (DictConfig): The hydra configuration of the agent
+        file_path (str): The destination path for the resulting plots
 
+    Returns:
+        None
+    """
+    device = torch.device(cfg.device)
     if cfg.verbose:
         print("\n\nInitialize environment and model")
-    device = th.device(cfg.device)
+        print(f"\nDevice: {device}")
 
     # Initialize the environment
-    env = gym.make(cfg.env)
-    env = gym.wrappers.RecordEpisodeStatistics(env)
+    # video_folder = os.path.join("src/outputs", cfg.agent.name, "videos")
+    # os.makedirs(video_folder, exist_ok=True)
+    env = gym.make(cfg.env) # , render_mode="rgb_array")
+    # env = RecordVideo(env, video_folder=video_folder, name_prefix="eval")
+    env = RecordEpisodeStatistics(env)
+
+    memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
+
+    if isinstance(env.action_space, spaces.Box):
+        n_actions = cfg.bins
+        env = DiscreteActionWrapper(env, bins=cfg.bins)
+    elif isinstance(env.action_space, spaces.Discrete):
+        n_actions = env.action_space.n
+
+    if isinstance(env.observation_space, spaces.Box):
+        n_oberservations = env.observation_space.shape[0]
+    else:
+        state, info = env.reset()
+        n_oberservations = len(state)
+
+    # Initialize the agents network
+    policy_net = hydra.utils.instantiate(
+        config=cfg.network,
+        n_observations=n_oberservations,
+        n_actions=n_actions,
+    ).to(device=device)
 
     # Set up model
-    model = hydra.utils.instantiate(config=cfg.agent).to(device=device)
-    if cfg.verbose:
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"\tModel {cfg.agent._target_} was trained with {trainable_params} trainable parameters")
-
+    agent: Agent = hydra.utils.instantiate(
+        config=cfg.agent,
+        env=env,
+        memory=memory,
+        policy_net=policy_net,
+        n_actions=n_actions,
+        n_observations=n_oberservations,
+        device=device,
+    )
     # Load checkpoint from file
-    checkpoint_path = os.path.join("src/outputs", cfg.agent.name, "checkpoints", f"{cfg.agent.name}_best.ckpt")
-    if cfg.verbose:
-        print(f"\tRestoring model from {checkpoint_path}")
-    checkpoint = th.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint["network_state_dict"])
+    checkpoint_path = os.path.join(
+        "src/outputs",
+        cfg.agent.name,
+        "checkpoints",
+        f"{cfg.agent.name}_last.ckpt",
+    )
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    agent.load_state_dict(**checkpoint)
 
     # Evaluate the model
-    if cfg.verbose:
-        print("\nEvaluating the model")
-    state, info = env.reset()
-    state = th.tensor(state, dtype=th.float32, device=device).unsqueeze(0)
-    done = False
-    rewards = []
-
-    while not done:
-        action = model(state).max(1).indices.view(1, 1)
-        next_state, reward, terminated, truncated, _ = env.step(action.item())
-        rewards.append(reward)
-        done = terminated or truncated
-        if not done:
-            next_state = th.tensor(next_state, dtype=th.float32, device=device).unsqueeze(0)
-            state = next_state
-
-    total_reward = sum(rewards)
-    print("Total reward:", total_reward)
-
-    # Extract episode statistics
-    episode_stats = env.episode_statistics
+    print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
+    episode_stats = {}
+    for episode in range(cfg.testing.episodes):
+        state, info = env.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+        done = False
+        rewards = []
+        while not done:
+            action = agent.select_action(state)
+            next_state, reward, terminated, truncated, info = env.step(action.item())
+            rewards.append(reward)
+            done = terminated or truncated
+            if not done:
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+                state = next_state
+            else:
+                return_code = "termination" if terminated else "truncation"
+                print(f"Episode finished due to {return_code}.")
+                if "episode" in info:
+                    stats = info["episode"]
+                    stats["rewards"] = rewards
+                    episode_stats.update({episode:stats})
 
     # Save episode statistics
     episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
@@ -81,10 +120,8 @@ def evaluate_model(cfg: DictConfig) -> None:
     if cfg.verbose:
         print(f"Episode statistics saved to {stats_file_path}")
 
-    return rewards
 
-
-def reward_plot(rewards, file_path, show=False):
+def plot_rewards(agent_out_dir, n_episodes=1, show=True):
     """
     Saves a plot of the rewards.
 
@@ -95,20 +132,30 @@ def reward_plot(rewards, file_path, show=False):
     Returns:
         None
     """
-    print(f"\tSaving reward plot to {file_path}")
-    fig, ax = plt.subplots(1, 1, figsize=[8, 2])
-    ax.plot(range(len(rewards)), rewards, label="Reward")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Reward")
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(file_path, "rewards.png"), dpi=150, bbox_inches="tight")
-    if show:
-        plt.show()
-        
+    file_path = glob.glob(agent_out_dir + "/episode_statistics/*.json")[0]
+    episode_stats = load_episode_statistics(file_path, n_episodes)
+
+    for episode, stats in episode_stats.items():
+        figure_name = f"rewards_episode_{episode}"
+        rewards = stats["rewards"]
+
+        fig, ax = plt.subplots(1, 1, figsize=[7, 3])
+        ax.plot(range(len(rewards)), rewards, label="Reward")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Reward")
+        ax.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(agent_out_dir, "figures", f"{figure_name}.png"), bbox_inches="tight")
+        if show:
+            plt.show()
+
+def load_episode_statistics(file_path, n_episodes=1) -> dict:
+    with open(file_path) as file:
+        data = json.load(file)
+    return {int(k): data[k] for k in list(data.keys())[:n_episodes]}
 
 def animate_episode(env, model, device, file_path):
-    pass # TODO
+    pass  # TODO
 
 
 def run_evaluations(
@@ -138,12 +185,20 @@ def run_evaluations(
 
         if cfg.seed:
             np.random.seed(cfg.seed)
-            th.manual_seed(cfg.seed)
+            torch.manual_seed(cfg.seed)
 
-        file_path = os.path.join("src/outputs", str(cfg.agent.name), "figures")
-        os.makedirs(file_path, exist_ok=True)
-        rewards = evaluate_model(cfg=cfg)
-        reward_plot(rewards, file_path)
+        evaluate_model(cfg=cfg)
+
+        # Visualize the results
+        agent_output_dir = os.path.join("src/outputs", cfg.agent.name)
+        figures_dir = os.path.join(agent_output_dir, "figures")
+        os.makedirs(figures_dir, exist_ok=True)
+
+        plot_rewards(
+            agent_output_dir,
+            n_episodes=cfg.testing.episodes,
+            show=cfg.testing.show_figures,
+        )
 
 
 if __name__ == "__main__":
