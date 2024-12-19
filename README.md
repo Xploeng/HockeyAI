@@ -88,8 +88,8 @@ docker push your_dockerhub_username/hockeyai
 - **Job Name**: Default "HockeyAI-Sigma0" (line 7)
 - **GPU**: Default 4 GPUs (that is the max -> line 20)
 - **Logs**: 
-  - stderr: logs/JobName_JobID_Date_Time.err
-  - stdout: logs/JobName_JobID_Date_Time.out
+  - stderr: job.*jobID*.err
+  - stdout: job.*jobID*.out
   - found in the HockeyAI folder
 - **Script Execution**: The sbatch file will run `train.py` with the specified config in *src/configs/config.yaml* by default.
   - Ensure your config file is what you want before submitting the job. 
