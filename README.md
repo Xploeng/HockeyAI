@@ -1,7 +1,7 @@
 # HockeyAI Setup Guide
 
 ## Installation
-Run `poetry install` to install all dependencies (Python 3.12.3 seems to work on first try)
+Run `poetry install` to install all dependencies 
 
 ## Cluster Access
 
@@ -63,7 +63,7 @@ We use Docker to create an environment for Singularity execution on the cluster.
 **Only needed if dependencies change:**
 ```bash
 # Rebuild image (uses dependencies defined in pyproject.toml)
-docker build -t your_dockerhub_username/hockeyai .
+docker build --platform linux/amd64 -t your_dockerhub_username/hockeyai .
 
 # Login to Docker Hub
 docker login
@@ -71,28 +71,29 @@ docker login
 # Push image
 docker push your_dockerhub_username/hockeyai
 ```
-> Note: Update the image URL in sbatch file from `docker://rickberd/hockeyai` to `docker://your_dockerhub_username/hockeyai`
+> Note: Update the image URL in sbatch file (line 40) from `docker://rickberd/hockeyai` to `docker://your_dockerhub_username/hockeyai`
 
 ## Job Management
 
 ### Key Configurations in hockeyai.sbatch
-- **Email Notifications**: Update line 31 with your email for job notification (started, failed, finished)
-- **Timeout**: Default 23h59min (line 19)
+- **Email Notifications**: Update line 37 with your email for job notification (started, failed, finished)
+- **Timeout**: Default 23h59min (line 23)
   - Format options: "minutes:seconds", "hours:minutes:seconds", "days-hours", "days-hours:minutes", "days-hours:minutes:seconds"
-- **Partition**: Default "day" partition (line 9)
+- **Partition**: Default "day" partition (line 14)
   - "test": up to 15 mins 
   - "day": up to 24 hours
   - "week": up to 7 days
   - "month": up to 30 days
   > Note: Remember to adjust both partition and timeout if you need longer runtime
-- **Job Name**: Default "HockeyAI-Sigma0"
-- **GPU**: Default 4 GPUs (max)
+- **Job Name**: Default "HockeyAI-Sigma0" (line 7)
+- **GPU**: Default 4 GPUs (that is the max -> line 20)
 - **Logs**: 
-  - stderr: `job.*jobID*.err`
-  - stdout: `job.*jobID*.out`
+  - stderr: logs/JobName_JobID_Date_Time.err
+  - stdout: logs/JobName_JobID_Date_Time.out
   - found in the HockeyAI folder
-- **Script Execution**: The sbatch file will run `train.py` with the specified config in *src/configs/config.yaml*
-  - Ensure your config file is what you want before submitting the job
+- **Script Execution**: The sbatch file will run `train.py` with the specified config in *src/configs/config.yaml* by default.
+  - Ensure your config file is what you want before submitting the job. 
+  - You can adjust what will be run in line 40 of the sbatch file (add args, change script or whatever).
 
 ### Job Commands
 ```bash
