@@ -121,3 +121,52 @@ scp -P 443 <username>@login1.tcml.uni-tuebingen.de:~/HockeyAI/outputs/<experimen
 
 ## Documentation
 For more details, see the [TCML Documentation](https://cogsys.cs.uni-tuebingen.de/webprojects/TCML/TCML_Documentation_2024-12-19.pdf)
+
+## Training
+
+Model training can be invoked via the training script, e.g., by calling
+
+```bash
+python src/scripts/train.py agent.name=dql device=cpu
+```
+
+You can add additional configurations to an existing experiment with the +experiment argument, e.g.,
+
+```bash
+python src/scripts/train.py +experiment=test1 agent.name=dql device=cuda:0
+```
+
+Model checkpoints (holding the trained weights) and Tensorboard logs for inspecting the training progression are written to model-specific output directories, such as `outputs/test1`.
+
+> [!TIP]
+> The progression of the training (convergence of error over training time) of one or multiple models can be inspected with Tensorboard by calling
+>
+> ```bash
+> tensorboard --logdir src/outputs
+> ```
+
+> and opening `http://localhost:6006/` in a browser (e.g. Firefox).
+
+## Evaluation
+
+To evaluate a trained model, run
+
+```bash
+python src/scripts/evaluate.py -c outputs/test1
+```
+
+The accurate agent.name must be provided as -c argument (standing for "checkpoint"). The evaluation script will compute an RMSE and animate the evironment with the agent's policy.
+
+Multi- and cross-model evaluations can be performed by passing multiple model names, e.g.,
+
+```bash
+python src/scripts/evaluate.py -c outputs/test1 outputs/test2
+```
+
+Wildcards can be used to indicate a family of models by name, e.g.,
+
+```bash
+python src/scripts/evaluate.py -c outputs/*dql*
+```
+
+evaluates all models in the `outputs` directory that have `dql` in their name.

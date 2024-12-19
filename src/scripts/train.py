@@ -1,10 +1,10 @@
 import os
 import sys
 import threading
+
+from copy import deepcopy
 import gymnasium as gym
 import hydra
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.utils.tensorboard as tb
@@ -20,6 +20,9 @@ from utils import DiscreteActionWrapper, ReplayMemory, write_checkpoint
 
 @hydra.main(config_path="../configs/", config_name="config", version_base=None)
 def run_training(cfg):
+
+    device = torch.device(cfg.device)
+    print(f"\nDevice: {device}")
 
     env = gym.make(cfg.env)
     env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -38,7 +41,6 @@ def run_training(cfg):
     if cfg.seed:
         np.random.seed(cfg.seed)
         torch.manual_seed(cfg.seed)
-    device = torch.device(cfg.device)
 
     # Initialize the replay buffer
     memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
@@ -88,9 +90,9 @@ def run_training(cfg):
     if cfg.training.continue_training:
         checkpoint = torch.load(checkpoint_path, map_location=device)
         agent.load_state_dict(**checkpoint)
-        episode = checkpoint["episode"]
+        start_episode = checkpoint["episode"]
     else:
-        episode = 0
+        start_episode = 0
 
     # Write the model configurations to the model save path
     os.makedirs(os.path.join("src/outputs", cfg.agent.name), exist_ok=True)
@@ -102,8 +104,8 @@ def run_training(cfg):
 
     # training loop
     print("Starting training")
-    print(f"Training from {episode} to {cfg.training.episodes} episodes")
-    for episode in tqdm(range(episode, cfg.training.episodes)):
+    print(f"Training from {start_episode} to {cfg.training.episodes} episodes")
+    for episode in tqdm(range(start_episode, cfg.training.episodes)):
         # Track the episode number and learning rate
         writer.add_scalar(
             tag="Episode",
@@ -152,9 +154,10 @@ def run_training(cfg):
             )
         # Write checkpoint to file, using a separate thread
         if cfg.training.save_agent and episode % cfg.training.save_interval == 0:
+            agent_cp, optimizer_cp = deepcopy(agent), deepcopy(optimizer)
             thread = threading.Thread(
                 target=write_checkpoint,
-                args=(agent, optimizer, episode, checkpoint_path),
+                args=(agent_cp, optimizer_cp, episode, checkpoint_path),
             )
             thread.start()
     try:
