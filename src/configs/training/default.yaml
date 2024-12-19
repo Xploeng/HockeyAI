@@ -6,3 +6,7 @@ episodes: 200
 batch_size: 128
 tau: 0.005
 gamma: 0.99
+
+save_agent: True
+save_interval: 100
+continue_training: False

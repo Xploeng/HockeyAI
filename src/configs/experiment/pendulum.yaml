@@ -1,10 +1,9 @@
 # @package _global_
 
-device: cuda:0
-env: CartPole-v1
+env: Pendulum-v1
 
 agent:
-  name: test1
+  name: pendulum-dql
   eps_start: 0.9
   eps_end: 0.05
   eps_decay: 1000
@@ -15,3 +14,5 @@ network:
 training:
   episodes: 600
   batch_size: 128
+  save_agent: True
+  continue_training: False
