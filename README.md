@@ -120,4 +120,4 @@ scp -P 443 <username>@login1.tcml.uni-tuebingen.de:~/HockeyAI/outputs/<experimen
 
 
 ## Documentation
-For more details, see the [TCML Documentation](https://csweb.cs.uni-tuebingen.de/webprojects/TCML/TCML_Documentation_2022-03-03.pdf)
+For more details, see the [TCML Documentation](https://cogsys.cs.uni-tuebingen.de/webprojects/TCML/TCML_Documentation_2024-12-19.pdf)
