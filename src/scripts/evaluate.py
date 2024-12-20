@@ -1,15 +1,11 @@
 import argparse
-import glob
-import json
 import os
 import sys
 import warnings
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import asdict
 import gymnasium as gym
 import hydra
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -22,28 +18,7 @@ from PIL import Image
 sys.path.append("src/")
 from agents import Agent
 from utils import DiscreteActionWrapper, ReplayMemory
-
-
-@dataclass
-class EpisodeStatistics:
-    episode: int
-    rewards: list[float]
-    info: dict[str, Any]
-
-
-def save_json(data: Any, file_path: str) -> None:
-    with open(file_path, "w") as f:
-        json.dump(data, f, indent=4)
-
-
-def save_gif(frames: list[Image.Image], file_path: str, duration: int = 50) -> None:
-    frames[0].save(
-        file_path,
-        save_all=True,
-        append_images=frames[1:],
-        duration=duration,
-        loop=0,
-    )
+from utils.visuals import EpisodeStatistics, plot_rewards, save_gif, save_json
 
 
 def initialize_environment(cfg: DictConfig) -> gym.Env:
@@ -138,31 +113,6 @@ def evaluate_model(cfg: DictConfig) -> None:
     stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{cfg.agent.name}.json")
     save_json(all_episode_stats, stats_file_path)
     print(f"Episode statistics saved to {stats_file_path}")
-
-
-def plot_rewards(agent_out_dir: str, n_episodes: int = 1, show: bool = True) -> None:
-    file_path = glob.glob(agent_out_dir + "/episode_statistics/*.json")[0]
-
-    with open(file_path) as f:
-        episode_stats = json.load(f)
-
-    fig, ax = plt.subplots(figsize=(7, 3))
-
-    for episode, stats in list(episode_stats.items())[:n_episodes]:
-        rewards = stats["rewards"]
-        ax.plot(range(len(rewards)), rewards, label=f"Rewards_{episode}")
-
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Reward")
-    ax.legend()
-    plt.tight_layout()
-
-    figure_path = os.path.join(agent_out_dir, "figures", f"rewards_0:{episode}.png")
-    os.makedirs(os.path.dirname(figure_path), exist_ok=True)
-    plt.savefig(figure_path, bbox_inches="tight")
-
-    if show:
-        plt.show()
 
 
 def run_evaluations(configuration_dir_list: list[str], device: str, silent: bool = False) -> None:
