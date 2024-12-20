@@ -18,7 +18,7 @@ from PIL import Image
 sys.path.append("src/")
 from agents import Agent
 from utils import DiscreteActionWrapper, ReplayMemory
-from utils.visuals import EpisodeStatistics, plot_rewards, save_gif, save_json
+from utils.visuals import EpisodeStatistics, plot_q_function_all_dims, plot_rewards, save_gif, save_json
 
 
 def initialize_environment(cfg: DictConfig) -> gym.Env:
@@ -70,20 +70,27 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device) -> Age
 def evaluate_model(cfg: DictConfig) -> None:
     device = torch.device(cfg.device)
 
-    env = initialize_environment(cfg)
-    agent = initialize_agent(cfg, env, device)
-
-    # Fresh recordings (dump training recordings)
-    agent.memory.clear()
-
     animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
     os.makedirs(animation_dir, exist_ok=True)
 
     episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
     os.makedirs(episode_stats_dir, exist_ok=True)
 
-    all_episode_stats = {}
+    figures_dir = os.path.join("src/outputs", cfg.agent.name, "figures")
+    os.makedirs(figures_dir, exist_ok=True)
 
+    # Initialize the environment and agent
+    env = initialize_environment(cfg)
+    agent = initialize_agent(cfg, env, device)
+
+    # Fresh recordings (clear training recordings)
+    agent.memory.clear()
+
+    # Plot the Q-function for all state dimensions
+    plot_q_function_all_dims(agent, cfg.env, figures_dir)
+
+    # Start the evaluation
+    all_episode_stats = {}
     print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
     for episode in range(cfg.testing.episodes):
 

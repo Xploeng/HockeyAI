@@ -100,7 +100,7 @@ def preprocess_pendulum_states(dots: np.ndarray, xx: np.ndarray, yy: np.ndarray)
 
 def pendulum_config():
     return EnvironmentConfig(
-        name="Pendulum",
+        name="Pendulum-v1",
         input_dims=3,
         ranges={
             PendulumDims.ANGLE.value: np.linspace(-np.pi / 2, np.pi / 2, 50),
@@ -116,7 +116,7 @@ def pendulum_config():
 
 def cartpole_config():
     return EnvironmentConfig(
-        name="CartPole",
+        name="CartPole-v1",
         input_dims=4,
         ranges={
             CartPoleDims.CART_POSITION.value: np.linspace(-4.8, 4.8, 50),
@@ -131,6 +131,18 @@ def cartpole_config():
             CartPoleDims.POLE_ANGULAR_VELOCITY.value: "Pole Angular Velocity",
         },
     )
+
+
+def get_env_config(env_name: str) -> EnvironmentConfig:
+    match env_name:
+        case "Pendulum-v1":
+            return pendulum_config()
+        case "CartPole-v1":
+            return cartpole_config()
+        case "Hockey":
+            return None # TODO: Add hockey config
+        case _:
+            raise ValueError(f"Unknown environment name: {env_name}")
 
 
 def plot_q_function(
@@ -185,7 +197,7 @@ def plot_q_function(
     return fig
 
 
-def plot_q_function_all_dims(agent: Any, config: EnvironmentConfig, out_dir: str) -> None:
+def plot_q_function_all_dims(agent: Any, env_name: str, out_dir: str) -> None:
     """
     Generate Q-value surface plots for all possible dimension combinations.
 
@@ -193,6 +205,7 @@ def plot_q_function_all_dims(agent: Any, config: EnvironmentConfig, out_dir: str
         agent: The agent with a `policy_net` attribute that has a `max_q` method.
         config: The environment configuration.
     """
+    config = get_env_config(env_name)
     value_function = agent.policy_net
 
     dims = list(config.ranges.keys())
@@ -211,3 +224,5 @@ def plot_q_function_all_dims(agent: Any, config: EnvironmentConfig, out_dir: str
         file_name = f"q_value_surface_{label_dim1}_vs_{label_dim2}.png"
         fig.savefig(os.path.join(out_dir, file_name), bbox_inches="tight")
         plt.close(fig)
+
+    print(f"Value function surface figures saved to {out_dir}")
