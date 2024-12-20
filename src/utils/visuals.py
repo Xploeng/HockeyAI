@@ -192,7 +192,6 @@ def plot_q_function(
     ax.set_zlabel("Q-Value")
     plt.colorbar(surf)
     plt.title(f"Q-Value Surface ({label_dim1} vs {label_dim2})")
-    plt.savefig(f"q_value_surface_{label_dim1}_vs_{label_dim2}.png")
 
     return fig
 
@@ -210,7 +209,6 @@ def plot_q_function_all_dims(agent: Any, env_name: str, out_dir: str) -> None:
 
     dims = list(config.ranges.keys())
     for plot_dim1, plot_dim2 in combinations(dims, 2):
-        print(f"Plotting Q-value surface for dimensions {plot_dim1} and {plot_dim2}")
         fig = plot_q_function(
             value_function=value_function,
             config=config,
