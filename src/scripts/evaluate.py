@@ -73,6 +73,9 @@ def evaluate_model(cfg: DictConfig) -> None:
     env = initialize_environment(cfg)
     agent = initialize_agent(cfg, env, device)
 
+    # Fresh recordings (dump training recordings)
+    agent.memory.clear()
+
     animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
     os.makedirs(animation_dir, exist_ok=True)
 
@@ -83,33 +86,40 @@ def evaluate_model(cfg: DictConfig) -> None:
 
     print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
     for episode in range(cfg.testing.episodes):
+
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         done = False
-        rewards = []
         frames = []
 
         while not done:
+
+            # Render the environment and save the frames
             frame = env.render()
             if frame is not None:
                 frames.append(Image.fromarray(frame))
 
+            # Action selection and recording the transition
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, info = env.step(action.item())
-            rewards.append(reward)
             done = terminated or truncated
+            agent.record(state, action, next_state, reward, done)
 
             if not done:
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
                 state = next_state
 
-        episode_stats = EpisodeStatistics(episode=episode, rewards=rewards, info=info)
+        # Keep track of episode statistics and save the animation
+        rewards, states = agent.memory.rewards, agent.memory.states
+        episode_stats = EpisodeStatistics(episode=episode, rewards=rewards, states=states, info=info)
         all_episode_stats[episode] = asdict(episode_stats)
+        agent.memory.clear()
 
         gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
         save_gif(frames, gif_path)
         print(f"Episode {episode} animation saved as {gif_path}")
 
+    # Save the episode statistics as json
     stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{cfg.agent.name}.json")
     save_json(all_episode_stats, stats_file_path)
     print(f"Episode statistics saved to {stats_file_path}")
