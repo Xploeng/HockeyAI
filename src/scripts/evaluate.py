@@ -1,204 +1,141 @@
-#! bin/env/python3
-
 import argparse
-import glob
-import json
 import os
 import sys
+import warnings
+
+from dataclasses import asdict
 import gymnasium as gym
 import hydra
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
 from gymnasium import spaces
-from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
-from matplotlib.animation import PillowWriter
+from gymnasium.wrappers import RecordEpisodeStatistics
 from omegaconf import DictConfig
 from PIL import Image
-from tqdm import tqdm
 
 
 sys.path.append("src/")
-from agents import Agent  # noqa: E402, F403, I001
-from utils import DiscreteActionWrapper, ReplayMemory  # noqa: E402, F403, I001
+from agents import Agent
+from utils import DiscreteActionWrapper, ReplayMemory
+from utils.visuals import EpisodeStatistics, plot_q_function_all_dims, plot_rewards, save_gif, save_json
 
 
-def evaluate_model(cfg: DictConfig) -> None:
-    """
-    Evaluates a single model for a given configuration.
-
-    Args:
-        cfg (DictConfig): The hydra configuration of the agent
-        file_path (str): The destination path for the resulting plots
-
-    Returns:
-        None
-    """
-    device = torch.device(cfg.device)
-    if cfg.verbose:
-        print("\n\nInitialize environment and model")
-        print(f"\nDevice: {device}")
-
-    # Directory for saving animations
-    animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
-    os.makedirs(animation_dir, exist_ok=True)
-
-    # Initialize the environment
-    # video_folder = os.path.join("src/outputs", cfg.agent.name, "videos")
-    # os.makedirs(video_folder, exist_ok=True)
+def initialize_environment(cfg: DictConfig) -> gym.Env:
     env = gym.make(cfg.env, render_mode="rgb_array")
-    # env = RecordVideo(env, video_folder=video_folder, name_prefix="eval")
     env = RecordEpisodeStatistics(env)
 
-    memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
-
     if isinstance(env.action_space, spaces.Box):
-        n_actions = cfg.bins
         env = DiscreteActionWrapper(env, bins=cfg.bins)
-    elif isinstance(env.action_space, spaces.Discrete):
-        n_actions = env.action_space.n
 
-    if isinstance(env.observation_space, spaces.Box):
-        n_oberservations = env.observation_space.shape[0]
-    else:
-        state, info = env.reset()
-        n_oberservations = len(state)
+    return env
 
-    # Initialize the agents network
+
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device) -> Agent:
+    n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else cfg.bins
+    n_observations = env.observation_space.shape[0]
+
     policy_net = hydra.utils.instantiate(
         config=cfg.network,
-        n_observations=n_oberservations,
+        n_observations=n_observations,
         n_actions=n_actions,
     ).to(device=device)
 
-    # Set up model
+    memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
+
     agent: Agent = hydra.utils.instantiate(
         config=cfg.agent,
         env=env,
         memory=memory,
         policy_net=policy_net,
         n_actions=n_actions,
-        n_observations=n_oberservations,
+        n_observations=n_observations,
         device=device,
     )
-    # Load checkpoint from file
+
     checkpoint_path = os.path.join(
         "src/outputs",
         cfg.agent.name,
         "checkpoints",
         f"{cfg.agent.name}_last.ckpt",
     )
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
     agent.load_state_dict(**checkpoint)
 
-    # Evaluate the model
+    return agent
+
+
+def evaluate_model(cfg: DictConfig) -> None:
+    device = torch.device(cfg.device)
+
+    animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
+    os.makedirs(animation_dir, exist_ok=True)
+
+    episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
+    os.makedirs(episode_stats_dir, exist_ok=True)
+
+    figures_dir = os.path.join("src/outputs", cfg.agent.name, "figures")
+    os.makedirs(figures_dir, exist_ok=True)
+
+    # Initialize the environment and agent
+    env = initialize_environment(cfg)
+    agent = initialize_agent(cfg, env, device)
+
+    # Fresh recordings (clear training recordings)
+    agent.memory.clear()
+
+    # Plot the Q-function for all state dimensions
+    plot_q_function_all_dims(agent, cfg.env, figures_dir)
+
+    # Start the evaluation
+    all_episode_stats = {}
     print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
-    episode_stats = {}
     for episode in range(cfg.testing.episodes):
+
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         done = False
-        rewards = []
         frames = []
 
         while not done:
-            frame = env.render()
-            frames.append(Image.fromarray(frame))
 
+            # Render the environment and save the frames
+            frame = env.render()
+            if frame is not None:
+                frames.append(Image.fromarray(frame))
+
+            # Action selection and recording the transition
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, info = env.step(action.item())
-            rewards.append(reward)
             done = terminated or truncated
+            agent.record(state, action, next_state, reward, done)
+
             if not done:
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
                 state = next_state
-            else:
-                return_code = "termination" if terminated else "truncation"
-                print(f"Episode finished due to {return_code}.")
-                if "episode" in info:
-                    stats = info["episode"]
-                    stats["rewards"] = rewards
-                    episode_stats.update({episode:stats})
 
-        # Save the frames as a GIF
+        # Keep track of episode statistics and save the animation
+        rewards, states = agent.memory.rewards, agent.memory.states
+        episode_stats = EpisodeStatistics(episode=episode, rewards=rewards, states=states, info=info)
+        all_episode_stats[episode] = asdict(episode_stats)
+        agent.memory.clear()
+
         gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
-        frames[0].save(
-            gif_path,
-            save_all=True,
-            append_images=frames[1:],
-            duration=50,  # Duration between frames in milliseconds
-            loop=0,  # Infinite loop
-        )
+        save_gif(frames, gif_path)
         print(f"Episode {episode} animation saved as {gif_path}")
 
-    # Save episode statistics
-    episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
-    os.makedirs(episode_stats_dir, exist_ok=True)
+    # Save the episode statistics as json
     stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{cfg.agent.name}.json")
-    with open(stats_file_path, "w") as stats_file:
-        json.dump(episode_stats, stats_file, indent=4)
-    if cfg.verbose:
-        print(f"Episode statistics saved to {stats_file_path}")
+    save_json(all_episode_stats, stats_file_path)
+    print(f"Episode statistics saved to {stats_file_path}")
 
 
-def plot_rewards(agent_out_dir, n_episodes=1, show=True):
-    """
-    Saves a plot of the rewards.
-
-    Args:
-        rewards (list): List of rewards obtained during evaluation.
-        file_path (str): The destination path for the resulting plot.
-
-    Returns:
-        None
-    """
-    file_path = glob.glob(agent_out_dir + "/episode_statistics/*.json")[0]
-    episode_stats = load_episode_statistics(file_path, n_episodes)
-
-    for episode, stats in episode_stats.items():
-        figure_name = f"rewards_episode_{episode}"
-        rewards = stats["rewards"]
-
-        fig, ax = plt.subplots(1, 1, figsize=[7, 3])
-        ax.plot(range(len(rewards)), rewards, label="Reward")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Reward")
-        ax.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(agent_out_dir, "figures", f"{figure_name}.png"), bbox_inches="tight")
-        if show:
-            plt.show()
-
-def load_episode_statistics(file_path, n_episodes=1) -> dict:
-    with open(file_path) as file:
-        data = json.load(file)
-    return {int(k): data[k] for k in list(data.keys())[:n_episodes]}
-
-def animate_episode(env, model, device, file_path):
-    pass  # TODO
-
-
-def run_evaluations(
-    configuration_dir_list: str,
-    device: str,
-    silent: bool = False,
-) -> None:
-    """
-    Evaluates a model with the given configuration.
-
-    Args:
-        configuration_dir_list (str): A list of hydra configuration directories to the models for evaluation.
-        device (str): The device where the evaluations are performed.
-
-    Returns:
-        None
-    """
-
+def run_evaluations(configuration_dir_list: list[str], device: str, silent: bool = False) -> None:
     for configuration_dir in configuration_dir_list:
-        # Initialize the hydra configurations for this forecast
         config_path = os.path.join("..", configuration_dir, ".hydra")
-        # print(f"\nEvaluating models in {config_path}")
+
         with hydra.initialize(version_base=None, config_path=config_path):
             cfg = hydra.compose(config_name="config")
             cfg.device = device
@@ -210,11 +147,7 @@ def run_evaluations(
 
         evaluate_model(cfg=cfg)
 
-        # Visualize the results
         agent_output_dir = os.path.join("src/outputs", cfg.agent.name)
-        figures_dir = os.path.join(agent_output_dir, "figures")
-        os.makedirs(figures_dir, exist_ok=True)
-
         plot_rewards(
             agent_output_dir,
             n_episodes=cfg.testing.episodes,
@@ -223,10 +156,7 @@ def run_evaluations(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Evaluate a model with a given configuration. Particular properties of the configuration can be "
-        "overwritten, as listed by the -h flag.",
-    )
+    parser = argparse.ArgumentParser(description="Evaluate a model with a given configuration.")
     parser.add_argument(
         "-c",
         "--configuration-dir-list",
@@ -248,11 +178,10 @@ if __name__ == "__main__":
         help="Silent mode to prevent printing results to console and visualizing plots dynamically.",
     )
 
-    run_args = parser.parse_args()
+    args = parser.parse_args()
     run_evaluations(
-        configuration_dir_list=run_args.configuration_dir_list,
-        device=run_args.device,
-        silent=run_args.silent,
+        configuration_dir_list=args.configuration_dir_list,
+        device=args.device,
+        silent=args.silent,
     )
-
     print("Done.")
