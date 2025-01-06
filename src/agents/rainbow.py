@@ -5,8 +5,8 @@ from .dql import DeepQLearning
 
 
 sys.path.append("src/")
-from utils.replay import Transition
 import time
+from utils.replay import Transition
 
 
 class Rainbow(DeepQLearning):
@@ -15,7 +15,7 @@ class Rainbow(DeepQLearning):
         env,
         memory,
         policy_net,
-        episodes,
+        episodes=0,
         target_net=None,
         optimizer=None,
         criterion=None,
@@ -131,21 +131,25 @@ class Rainbow(DeepQLearning):
         # Update target network
         self.update_target(tau=tau)
 
+        update_target_time = time.time()
+
         # PER: update priorities
         loss_for_prior = elementwise_loss.detach().cpu().numpy()
         new_priorities = loss_for_prior + self.prior_eps
         self.memory.update_priorities(indices, new_priorities)
 
-        update_time = time.time()
+        update_priority_time = time.time()
 
-        # Write timings to file
-        with open(
-            "/home/jules/Documents/Uni/3.Semester/RL/HockeyAI/timings.txt",
-            "a",
-        ) as f:
-            f.write(f"Sample time: {sample_time - start_time}\n")
-            f.write(f"Transpose time: {transpose_time - sample_time}\n")
-            f.write(f"Compute Q time: {compute_q_time - transpose_time}\n")
-            f.write(f"Compute loss time: {compute_loss_time - compute_q_time}\n")
-            f.write(f"Update time: {update_time - compute_loss_time}\n")
-            f.write(f"Total time: {update_time - start_time}\n\n")
+        # # Write timings to file
+        # with open(
+        #     "/home/jules/Documents/Uni/3.Semester/RL/HockeyAI/timings.txt",
+        #     "a",
+        # ) as f:
+        #     f.write(f"Sample time: {sample_time - start_time}\n")
+        #     f.write(f"Transpose time: {transpose_time - sample_time}\n")
+        #     f.write(f"Compute Q time: {compute_q_time - transpose_time}\n")
+        #     f.write(f"Compute loss time: {compute_loss_time - compute_q_time}\n")
+        #     f.write(f"Update Target time: {update_target_time - compute_loss_time}\n")
+        #     f.write(
+        #         f"Update priorities time: {update_priority_time - update_target_time}\n\n"
+        #     )

@@ -28,7 +28,8 @@ class ReplayMemory:
         self.size = min(self.size + 1, self.capacity)
 
     def clear(self) -> None:
-        self.memory = np.array([self.capacity], dtype=object)
+        self.memory = np.empty([self.capacity], dtype=object)
+        self.ptr, self.size = 0, 0
 
     def sample(self, batch_size) -> dict:
         return dict(
@@ -43,7 +44,8 @@ class ReplayMemory:
 
     @property
     def rewards(self) -> list[float]:
-        return [transition.reward for transition in self.memory]
+        print(self.ptr)
+        return [transition.reward for transition in self.memory[: self.ptr]]
 
     @property
     def states(self) -> list:
@@ -53,7 +55,7 @@ class ReplayMemory:
                 if isinstance(transition.state, torch.Tensor)
                 else transition.state
             )
-            for transition in self.memory
+            for transition in self.memory[: self.ptr]
         ]
 
 
@@ -98,14 +100,15 @@ class PrioritizedReplayMemory(ReplayMemory):
         """Update priorities of sampled transitions."""
         assert len(indices) == len(priorities)
 
+        priorities = priorities**self.alpha
+        self.max_priority = max(self.max_priority, np.max(priorities))
+
         for idx, priority in zip(indices, priorities):
             assert priority > 0
             assert 0 <= idx < len(self)
 
-            self.sum_tree[idx] = priority**self.alpha
-            self.min_tree[idx] = priority**self.alpha
-
-            self.max_priority = max(self.max_priority, priority)
+            self.sum_tree[idx] = priority
+            self.min_tree[idx] = priority
 
     def _sample_proportional(self, batch_size) -> list[int]:
         """Sample indices based on proportions."""
