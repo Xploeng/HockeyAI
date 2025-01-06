@@ -17,13 +17,13 @@ class DeepQLearning(Agent):
         env,
         memory,
         policy_net,
-        target_net = None,
-        optimizer = None,
-        criterion = None,
-        device = "cuda:0",
-        eps_start = 0.9,
-        eps_end = 0.05,
-        eps_decay = 1000,
+        target_net=None,
+        optimizer=None,
+        criterion=None,
+        device="cuda:0",
+        eps_start=0.9,
+        eps_end=0.05,
+        eps_decay=1000,
         **_,
     ):
         super().__init__()
@@ -60,7 +60,7 @@ class DeepQLearning(Agent):
     def optimize(self, batch_size, gamma, tau, **_):
         if len(self.memory) < batch_size:
             return
-        transitions = self.memory.sample(batch_size)
+        transitions = self.memory.sample(batch_size)["transitions"]
 
         batch = Transition(*zip(*transitions))
 

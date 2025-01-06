@@ -23,6 +23,8 @@ def run_training(cfg):
 
     device = torch.device(cfg.device)
     print(f"\nDevice: {device}")
+    print(f"Environment: {cfg.env}")
+    print(f"Agent: {cfg.agent.name} of type {cfg.agent._target_}")
 
     env = gym.make(cfg.env)
     env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -78,6 +80,7 @@ def run_training(cfg):
         memory=memory,
         env=env,
         device=device,
+        episodes=cfg.training.episodes,
     )
 
     # Load checkpoint from file to continue training or initialize training scalars
@@ -144,7 +147,7 @@ def run_training(cfg):
             state = next_state
 
             # Perform one step of the optimization (on the policy network)
-            agent.optimize(**cfg.training)
+            agent.optimize(**cfg.training, episode=episode)
 
             loss = agent.losses[-1] if len(agent.losses) > 0 else 0
             writer.add_scalar(

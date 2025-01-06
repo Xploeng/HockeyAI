@@ -1,0 +1,3 @@
+_target_: utils.PrioritizedReplayMemory
+capacity: 10000
+alpha: 0.2
