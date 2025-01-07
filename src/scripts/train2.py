@@ -22,20 +22,18 @@ def initialize_environment(cfg: DictConfig) -> gym.Env:
     env = gym.wrappers.RecordEpisodeStatistics(env)
 
     # Check if env continuous and agent not continuous -> wrap env
-    agent_continuous = cfg.agent.requires_continuous_action_space
+    agent_continuous = cfg.agent.requires_continues_action_space
     if isinstance(env.action_space, spaces.Box) and not agent_continuous:
-        env = DiscreteActionWrapper(env, bins=cfg.bins)
+        env = DiscreteActionWrapper(env, bins=cfg.agent.bins)
     else:
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
-
     return env
 
 
 def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
-
-    agent_continuous = cfg.agent.requires_continuous_action_space
+    agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
         raise ValueError(
@@ -46,10 +44,11 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
         config=cfg.agent,
         env=env,
         device=device,
+        recursive=False,
     )
 
     start_episode = 0
-    if cfg.training.continue_training:
+    if cfg.agent.training.continue_training:
         start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", FutureWarning)
@@ -89,7 +88,6 @@ def run_training(cfg: DictConfig):
     )
 
     env = initialize_environment(cfg)
-    print(cfg)
     agent, start_episode = initialize_agent(cfg, env, device, checkpoint_path)
 
     print(f"Starting training from episode {start_episode} to {cfg.training.episodes}")

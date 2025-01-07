@@ -1,13 +1,14 @@
 defaults: 
+  - memory: replay_buffer
   - network: dqn
   - training: default
-
 
 bins: 100
 
 # Agent
 # type: DQL Agent
 _target_: agents.DeepQLearning
+_recursive_: False
 name: DQL
 eps_start: 0.9
 eps_end: 0.05

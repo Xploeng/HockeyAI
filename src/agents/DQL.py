@@ -18,41 +18,44 @@ class DeepQLearning(Agent):
     def __init__(
         self,
         env,
-        training = True,
-        eps_start = 0.9,
-        eps_end = 0.05,
-        eps_decay = 1000,
-        device = torch.device("cuda:0"),
-        bins = 100,
+        memory,
+        network,
+        training,
+        eps_start=0.9,
+        eps_end=0.05,
+        eps_decay=1000,
+        device=torch.device("cuda:0"),
+        bins=100,
         **_,
     ):
+        print(memory, network, training)
         super().__init__()
         self.env = env
         self.eps_start = eps_start
         self.eps_end = eps_end
         self.eps_decay = eps_decay
         self.device = device
-        self.memory = ReplayMemory(memory_conf.capacity)
+        self.memory = ReplayMemory(memory.capacity)
 
         n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else bins
         n_observations = env.observation_space.shape[0]
 
         self.policy_net = hydra.utils.instantiate(
-            config=network_conf.policy,
+            config=network.policy,
             n_observations=n_observations,
             n_actions=n_actions,
         ).to(self.device)
 
         if training:
             self.target_net = hydra.utils.instantiate(
-                config=network_conf.target,
+                config=network.target,
                 n_observations=n_observations,
                 n_actions=n_actions,
             ).to(self.device)
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
-            self.optimizer = hydra.utils.instantiate(config=training_conf.optimizer, params=self.policy_net.parameters())
-            self.criterion = hydra.utils.instantiate(config=training_conf.criterion)
+        self.optimizer = hydra.utils.instantiate(config=training.optimizer, params=self.policy_net.parameters())
+        self.criterion = hydra.utils.instantiate(config=training.criterion)
 
     def record(self, state, action, next_state, reward, done):
         self.memory.push(state, action, next_state, reward, done)

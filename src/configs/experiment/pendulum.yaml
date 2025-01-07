@@ -8,11 +8,11 @@ agent:
   eps_end: 0.05
   eps_decay: 1000
 
-network:
-  hidden_size: 128
+  network:
+    hidden_size: 128
 
-training:
-  episodes: 600
-  batch_size: 128
-  save_agent: True
-  continue_training: False
+  training:
+    episodes: 600
+    batch_size: 128
+    save_agent: True
+    continue_training: False
