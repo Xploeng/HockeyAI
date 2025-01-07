@@ -1,0 +1,2 @@
+_target_: utils.DuelingQNetwork
+hidden_size: 128

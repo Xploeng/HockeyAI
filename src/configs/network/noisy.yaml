@@ -1,0 +1,2 @@
+_target_: utils.NoisyDueling
+hidden_size: 128
