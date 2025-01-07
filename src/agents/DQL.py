@@ -2,13 +2,14 @@ import collections
 import math
 import random
 import sys
+import hydra
 import torch
 
 from .agent import Agent
 
 
 sys.path.append("src/")
-from utils.replay import Transition
+from utils.replay import ReplayMemory, Transition
 
 
 class DeepQLearning(Agent):
@@ -135,4 +136,41 @@ class DeepQLearning(Agent):
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(
             {"network_state_dict": self.policy_net.state_dict(), "memory": self.memory},
+        )
+
+    @classmethod
+    def from_config(cls, cfg, env):
+        device = torch.device(cfg.device)
+        memory = ReplayMemory(cfg.memory.capacity)
+
+        n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else cfg.bins
+        n_observations = env.observation_space.shape[0]
+
+        policy_net = hydra.utils.instantiate(
+            config=cfg.network.policy,
+            n_observations=env.observation_space.shape[0],
+            n_actions=env.action_space.n,
+        ).to(device)
+
+        target_net = hydra.utils.instantiate(
+            config=cfg.network.target,
+            n_observations=env.observation_space.shape[0],
+            n_actions=env.action_space.n,
+        ).to(device)
+        target_net.load_state_dict(policy_net.state_dict())
+
+        optimizer = hydra.utils.instantiate(config=cfg.training.optimizer, params=policy_net.parameters())
+        criterion = hydra.utils.instantiate(config=cfg.training.criterion)
+
+        return cls(
+            env=env,
+            memory=memory,
+            policy_net=policy_net,
+            target_net=target_net,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
+            eps_start=cfg.agent.eps_start,
+            eps_end=cfg.agent.eps_end,
+            eps_decay=cfg.agent.eps_decay,
         )
