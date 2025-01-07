@@ -1,8 +1,6 @@
 import os
 import sys
-import threading
-
-from copy import deepcopy
+import warnings
 import gymnasium as gym
 import hydra
 import numpy as np
@@ -16,97 +14,102 @@ from tqdm import tqdm
 
 sys.path.append("src/")
 from agents import Agent
-from utils import DiscreteActionWrapper, ReplayMemory, write_checkpoint
+from utils.helper import DiscreteActionWrapper, load_checkpoint, save_checkpoint
 
 
-class Trainer:
-    """Handles the training pipeline for agents."""
+def initialize_environment(cfg: DictConfig) -> gym.Env:
+    env = gym.make(cfg.env)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
 
-    def __init__(self, cfg: DictConfig, agent, env, device):
-        self.cfg = cfg
-        self.agent = agent
-        self.env = env
-        self.device = device
-        self.writer = tb.SummaryWriter(log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"))
-        self.checkpoint_path = os.path.join(
-            "src/outputs",
-            cfg.agent.name,
-            "checkpoints",
-            f"{cfg.agent.name}_last.ckpt",
+    # Check if env continuous and agent not continuous -> wrap env
+    agent_continuous = cfg.agent.requires_continuous_action_space
+    if isinstance(env.action_space, spaces.Box) and not agent_continuous:
+        env = DiscreteActionWrapper(env, bins=cfg.bins)
+    else:
+        raise ValueError(
+            f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
 
-    def train(self):
-        start_episode = self._load_checkpoint()
+    return env
 
-        print(f"Starting training from episode {start_episode} to {self.cfg.training.episodes}")
-        for episode in tqdm(range(start_episode, self.cfg.training.episodes)):
-            self._train_episode(episode)
-            if self.cfg.training.save_agent and episode % self.cfg.training.save_interval == 0:
-                self._save_checkpoint(episode)
 
-        self.writer.flush()
-        self.writer.close()
-        self.env.close()
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
 
-    def _train_episode(self, episode):
-        state, _ = self.env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-        done = False
+    agent_continuous = cfg.agent.requires_continuous_action_space
+    env_continuous = isinstance(env.action_space, spaces.Box)
+    if agent_continuous and not env_continuous:
+        raise ValueError(
+            "The agent requires a continuous action space, but the environment has a discrete one."
+            )
 
-        while not done:
-            action = self.agent.select_action(state)
-            next_state, reward, terminated, truncated, _ = self.env.step(action.item())
-            reward = torch.tensor([reward], device=self.device)
-            done = terminated or truncated
+    agent: Agent = hydra.utils.instantiate(
+        config=cfg.agent,
+        env=env,
+        device=device,
+    )
 
-            if terminated:
-                next_state = None
-            else:
-                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+    start_episode = 0
+    if cfg.training.continue_training:
+        start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+        agent.load_state_dict(**checkpoint)
 
-            self.agent.record(state, action, next_state, reward, done)
-            self.agent.optimize(**self.cfg.training)
-
-            state = next_state
-
-        loss = self.agent.losses[-1] if self.agent.losses else 0
-        self.writer.add_scalar("Loss", loss, global_step=self.agent.steps_done)
-        self.writer.add_scalar("Episode", episode, global_step=self.agent.steps_done)
-
-    def _load_checkpoint(self):
-        if self.cfg.training.continue_training and os.path.exists(self.checkpoint_path):
-            checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
-            self.agent.load_state_dict(**checkpoint)
-            return checkpoint.get("episode", 0)
-        return 0
-
-    def _save_checkpoint(self, episode):
-        agent_cp = deepcopy(self.agent)
-        thread = threading.Thread(
-            target=write_checkpoint,
-            args=(agent_cp, self.agent.optimizer, episode, self.checkpoint_path),
-        )
-        thread.start()
-        thread.join()
-
+    return agent, start_episode
 
 @hydra.main(config_path="../configs/", config_name="config", version_base=None)
 def run_training(cfg: DictConfig):
-    device = torch.device(cfg.device)
-    print(f"Using device: {device}")
+    """
+    Orchestrates the training process for the specified number of episodes.
+
+    Args:
+        cfg (object): Configuration object containing training parameters.
+        agent (object): The agent to train.
+        env (object): The environment in which the agent operates.
+        device (str): The device for computation (CPU/GPU).
+
+    Returns:
+        None
+    """
+    writer = tb.SummaryWriter(log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"))
 
     if cfg.seed:
         np.random.seed(cfg.seed)
         torch.manual_seed(cfg.seed)
 
-    env = gym.make(cfg.env)
-    env = gym.wrappers.RecordEpisodeStatistics(env)
+    device = torch.device(cfg.device)
+    print(f"Using device: {device}")
 
-    agent = Agent.from_config(cfg.agent, env)
-    if isinstance(env.action_space, gym.spaces.Box) and not agent.is_continueous:
-        env = DiscreteActionWrapper(env, bins=cfg.bins)
+    checkpoint_path = os.path.join(
+        "src/outputs",
+        cfg.agent.name,
+        "checkpoints",
+        f"{cfg.agent.name}_last.ckpt",
+    )
 
-    trainer = Trainer(cfg, agent, env, device)
-    trainer.train()
+    env = initialize_environment(cfg)
+    print(cfg)
+    agent, start_episode = initialize_agent(cfg, env, device, checkpoint_path)
+
+    print(f"Starting training from episode {start_episode} to {cfg.training.episodes}")
+    for episode in tqdm(range(start_episode, cfg.training.episodes)):
+        # Delegate episode training to the agent
+        agent.train_episode(env, device, cfg.training)
+
+        # Log training stats to TensorBoard
+        loss = agent.losses[-1] if agent.losses else 0
+        writer.add_scalar("Loss", loss, global_step=agent.steps_done)
+        writer.add_scalar("Episode", episode, global_step=agent.steps_done)
+
+        # Save checkpoint periodically
+        if cfg.training.save_agent and episode % cfg.training.save_interval == 0:
+            save_checkpoint(agent, episode, checkpoint_path)
+
+    writer.flush()
+    writer.close()
+    env.close()
 
 
+if __name__ == "__main__":
+    run_training()

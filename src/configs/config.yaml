@@ -1,10 +1,7 @@
 defaults:
   - _self_
-  - training: default
   - testing: default
-  - agent: dql
-  - network: dqn
-  - memory: replay_buffer
+  - agent: default
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
@@ -12,7 +9,6 @@ device: cuda:0
 seed: 1234
 verbose : True
 env: CartPole-v1
-bins: 50
 
 hydra:
   run:

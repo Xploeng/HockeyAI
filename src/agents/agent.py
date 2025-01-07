@@ -1,8 +1,6 @@
 import collections
 
 from abc import ABC, abstractmethod
-import gymnasium as gym
-import hydra
 
 
 class Agent(ABC):
@@ -29,7 +27,3 @@ class Agent(ABC):
     @abstractmethod
     def state_dict(self) -> collections.OrderedDict:
         raise NotImplementedError
-
-    @classmethod
-    def from_config(cls, cfg, env):
-        return hydra.utils.instantiate(cfg, env=env)
