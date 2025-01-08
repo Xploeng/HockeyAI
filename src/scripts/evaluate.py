@@ -17,48 +17,38 @@ from PIL import Image
 
 sys.path.append("src/")
 from agents import Agent
-from utils import DiscreteActionWrapper, ReplayMemory
+from utils import DiscreteActionWrapper
 from utils.visuals import EpisodeStatistics, plot_q_function_all_dims, plot_rewards, save_gif, save_json
 
 
 def initialize_environment(cfg: DictConfig) -> gym.Env:
     env = gym.make(cfg.env, render_mode="rgb_array")
-    env = RecordEpisodeStatistics(env)
+    env = gym.wrappers.RecordEpisodeStatistics(env)
 
-    if isinstance(env.action_space, spaces.Box):
-        env = DiscreteActionWrapper(env, bins=cfg.bins)
-
+    # Check if env continuous and agent not continuous -> wrap env
+    agent_continuous = cfg.agent.requires_continues_action_space
+    if isinstance(env.action_space, spaces.Box) and not agent_continuous:
+        env = DiscreteActionWrapper(env, bins=cfg.agent.bins)
+    elif isinstance(env.action_space, spaces.Discrete) and agent_continuous:
+        raise ValueError(
+            f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
+        )
     return env
 
 
-def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device) -> Agent:
-    n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else cfg.bins
-    n_observations = env.observation_space.shape[0]
-
-    policy_net = hydra.utils.instantiate(
-        config=cfg.network,
-        n_observations=n_observations,
-        n_actions=n_actions,
-    ).to(device=device)
-
-    memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
+    agent_continuous = cfg.agent.requires_continues_action_space
+    env_continuous = isinstance(env.action_space, spaces.Box)
+    if agent_continuous and not env_continuous:
+        raise ValueError("The agent requires a continuous action space, but the environment has a discrete one.")
 
     agent: Agent = hydra.utils.instantiate(
         config=cfg.agent,
         env=env,
-        memory=memory,
-        policy_net=policy_net,
-        n_actions=n_actions,
-        n_observations=n_observations,
         device=device,
+        recursive=False,
     )
 
-    checkpoint_path = os.path.join(
-        "src/outputs",
-        cfg.agent.name,
-        "checkpoints",
-        f"{cfg.agent.name}_last.ckpt",
-    )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
         checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -72,16 +62,21 @@ def evaluate_model(cfg: DictConfig) -> None:
 
     animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
     os.makedirs(animation_dir, exist_ok=True)
-
     episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
     os.makedirs(episode_stats_dir, exist_ok=True)
-
     figures_dir = os.path.join("src/outputs", cfg.agent.name, "figures")
     os.makedirs(figures_dir, exist_ok=True)
 
+    checkpoint_path = os.path.join(
+        "src/outputs",
+        cfg.agent.name,
+        "checkpoints",
+        f"{cfg.agent.name}_last.ckpt",
+    )
+
     # Initialize the environment and agent
     env = initialize_environment(cfg)
-    agent = initialize_agent(cfg, env, device)
+    agent = initialize_agent(cfg, env, device, checkpoint_path)
 
     # Fresh recordings (clear training recordings)
     agent.memory.clear()

@@ -2,13 +2,16 @@ import collections
 import math
 import random
 import sys
+import hydra
 import torch
+
+from gymnasium import spaces
 
 from .agent import Agent
 
 
 sys.path.append("src/")
-from utils.replay import Transition
+from utils.replay import ReplayMemory, Transition
 
 
 class DeepQLearning(Agent):
@@ -16,27 +19,48 @@ class DeepQLearning(Agent):
         self,
         env,
         memory,
-        policy_net,
-        target_net = None,
-        optimizer = None,
-        criterion = None,
-        device = "cuda:0",
-        eps_start = 0.9,
-        eps_end = 0.05,
-        eps_decay = 1000,
+        network,
+        training,
+        eps_start=0.9,
+        eps_end=0.05,
+        eps_decay=1000,
+        device=torch.device("cuda:0"),
+        bins=100,
         **_,
     ):
         super().__init__()
-        self.policy_net = policy_net
-        self.target_net = target_net
-        self.memory = memory
         self.env = env
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.device = device
         self.eps_start = eps_start
         self.eps_end = eps_end
         self.eps_decay = eps_decay
+        self.device = device
+        self.memory_cfg = memory
+        self.network_cfg = network
+        self.training_cfg = training
+
+        self.memory = ReplayMemory(self.memory_cfg.capacity)
+
+        n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else bins
+        n_observations = env.observation_space.shape[0]
+
+        self.policy_net = hydra.utils.instantiate(
+            config=self.network_cfg,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+
+        self.target_net = hydra.utils.instantiate(
+            config=self.network_cfg,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
+        self.optimizer = hydra.utils.instantiate(
+            config=self.training_cfg.optimizer,
+            params=self.policy_net.parameters(),
+        )
+        self.criterion = hydra.utils.instantiate(config=self.training_cfg.criterion)
 
     def record(self, state, action, next_state, reward, done):
         self.memory.push(state, action, next_state, reward, done)
@@ -114,6 +138,27 @@ class DeepQLearning(Agent):
                 key
             ] * tau + target_net_state_dict[key] * (1 - tau)
         self.target_net.load_state_dict(target_net_state_dict)
+
+    def train_episode(self) -> None:
+        state, _ = self.env.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        done = False
+
+        while not done:
+            action = self.select_action(state)
+            next_state, reward, terminated, truncated, _ = self.env.step(action.item())
+            reward = torch.tensor([reward], device=self.device)
+            done = terminated or truncated
+
+            if terminated:
+                next_state = None
+            else:
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+
+            self.record(state, action, next_state, reward, done)
+            self.optimize(**self.training_cfg)
+
+            state = next_state
 
     def load_state_dict(
         self,
