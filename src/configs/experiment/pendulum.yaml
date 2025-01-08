@@ -12,7 +12,7 @@ agent:
     hidden_size: 128
 
   training:
-    episodes: 600
+    episodes: 100
     batch_size: 128
     save_agent: True
-    continue_training: False
+    continue_training: True

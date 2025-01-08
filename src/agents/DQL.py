@@ -28,34 +28,39 @@ class DeepQLearning(Agent):
         bins=100,
         **_,
     ):
-        print(memory, network, training)
         super().__init__()
         self.env = env
         self.eps_start = eps_start
         self.eps_end = eps_end
         self.eps_decay = eps_decay
         self.device = device
-        self.memory = ReplayMemory(memory.capacity)
+        self.memory_cfg = memory
+        self.network_cfg = network
+        self.training_cfg = training
+
+        self.memory = ReplayMemory(self.memory_cfg.capacity)
 
         n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else bins
         n_observations = env.observation_space.shape[0]
 
         self.policy_net = hydra.utils.instantiate(
-            config=network.policy,
+            config=self.network_cfg,
             n_observations=n_observations,
             n_actions=n_actions,
         ).to(self.device)
 
-        if training:
-            self.target_net = hydra.utils.instantiate(
-                config=network.target,
-                n_observations=n_observations,
-                n_actions=n_actions,
-            ).to(self.device)
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net = hydra.utils.instantiate(
+            config=self.network_cfg,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
 
-        self.optimizer = hydra.utils.instantiate(config=training.optimizer, params=self.policy_net.parameters())
-        self.criterion = hydra.utils.instantiate(config=training.criterion)
+        self.optimizer = hydra.utils.instantiate(
+            config=self.training_cfg.optimizer,
+            params=self.policy_net.parameters(),
+        )
+        self.criterion = hydra.utils.instantiate(config=self.training_cfg.criterion)
 
     def record(self, state, action, next_state, reward, done):
         self.memory.push(state, action, next_state, reward, done)
@@ -140,7 +145,7 @@ class DeepQLearning(Agent):
         done = False
 
         while not done:
-            action = self.agent.select_action(state)
+            action = self.select_action(state)
             next_state, reward, terminated, truncated, _ = self.env.step(action.item())
             reward = torch.tensor([reward], device=self.device)
             done = terminated or truncated
@@ -150,8 +155,8 @@ class DeepQLearning(Agent):
             else:
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
-            self.agent.record(state, action, next_state, reward, done)
-            self.agent.optimize(**self.cfg.training)
+            self.record(state, action, next_state, reward, done)
+            self.optimize(**self.training_cfg)
 
             state = next_state
 

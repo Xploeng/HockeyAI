@@ -21,7 +21,7 @@ class DQN(nn.Module):
         # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
-        return max(q_values, dim=1).values.detach().numpy()
+        return torch.max(q_values, dim=1).values.detach().numpy()
 
 
 class Critic(nn.Module):
@@ -65,4 +65,4 @@ class Actor(nn.Module):
         # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
-        return max(q_values, dim=1).values.detach().numpy()
+        return torch.max(q_values, dim=1).values.detach().numpy()

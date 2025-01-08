@@ -1,6 +1,5 @@
 import os
 import sys
-import warnings
 import gymnasium as gym
 import hydra
 import numpy as np
@@ -25,7 +24,7 @@ def initialize_environment(cfg: DictConfig) -> gym.Env:
     agent_continuous = cfg.agent.requires_continues_action_space
     if isinstance(env.action_space, spaces.Box) and not agent_continuous:
         env = DiscreteActionWrapper(env, bins=cfg.agent.bins)
-    else:
+    elif isinstance(env.action_space, spaces.Discrete) and agent_continuous:
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
@@ -47,13 +46,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
         recursive=False,
     )
 
-    start_episode = 0
-    if cfg.agent.training.continue_training:
-        start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            checkpoint = torch.load(checkpoint_path, map_location=device)
-        agent.load_state_dict(**checkpoint)
+    start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
 
     return agent, start_episode
 
@@ -90,19 +83,18 @@ def run_training(cfg: DictConfig):
     env = initialize_environment(cfg)
     agent, start_episode = initialize_agent(cfg, env, device, checkpoint_path)
 
-    print(f"Starting training from episode {start_episode} to {cfg.training.episodes}")
-    for episode in tqdm(range(start_episode, cfg.training.episodes)):
-        # Delegate episode training to the agent
-        agent.train_episode(env, device, cfg.training)
+    print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
+    for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
+        episode += start_episode
 
-        # Log training stats to TensorBoard
+        agent.train_episode()
+
         loss = agent.losses[-1] if agent.losses else 0
         writer.add_scalar("Loss", loss, global_step=agent.steps_done)
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
 
-        # Save checkpoint periodically
-        if cfg.training.save_agent and episode % cfg.training.save_interval == 0:
-            save_checkpoint(agent, episode, checkpoint_path)
+        if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:
+            save_checkpoint(agent, checkpoint_path, episode)
 
     writer.flush()
     writer.close()

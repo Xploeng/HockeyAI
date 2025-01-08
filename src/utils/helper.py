@@ -1,5 +1,6 @@
 import os
 import threading
+import warnings
 
 from copy import deepcopy
 import gymnasium as gym
@@ -21,8 +22,10 @@ def load_checkpoint(cfg, agent, checkpoint_path, device):
     Returns:
         int: The episode number from which to continue training, or 0 if no checkpoint is loaded.
     """
-    if cfg.training.continue_training and os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+    if cfg.agent.training.continue_training and os.path.exists(checkpoint_path):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            checkpoint = torch.load(checkpoint_path, map_location=device)
         agent.load_state_dict(**checkpoint)
         return checkpoint.get("episode", 0)
     return 0
