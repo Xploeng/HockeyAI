@@ -45,6 +45,10 @@ class Rainbow(DeepQLearning):
         self.beta = beta
         self.prior_eps = prior_eps
         self.episodes = episodes
+        self.v_min = 0.0
+        self.v_max = 200.0
+        self.atom_size = 51
+        self.support = torch.linspace(self.v_min, self.v_max, self.atom_size).to(self.device)
 
     def select_action(self, state):
         self.steps_done += 1
@@ -86,26 +90,26 @@ class Rainbow(DeepQLearning):
             next_dist = self.target_net.dist(non_final_next_states)
             next_dist = next_dist[range(batch_size), next_action]
 
-            t_z = reward_batch[non_final_mask] * gamma * self.support
+            t_z = reward_batch[non_final_mask].unsqueeze(-1) + gamma * self.support
             t_z = t_z.clamp(min=self.v_min, max=self.v_max)
             b = (t_z - self.v_min) / delta_z
             l = b.floor().long()
             u = b.ceil().long()
 
             offset = (
-                torch.linspace(0, (self.batch_size - 1) * self.atom_size, self.batch_size)
+                torch.linspace(0, (batch_size - 1) * self.atom_size, batch_size)
                 .long()
                 .unsqueeze(1)
-                .expand(self.batch_size, self.atom_size)
+                .expand(batch_size, self.atom_size)
                 .to(self.device)
             )
 
-            proj_dist = torch.zeros(next_dist.size(), device=self.device)
+            proj_dist = torch.zeros(next_dist.size(), device=self.device, dtype=torch.double)
             proj_dist.view(-1).index_add_(0, (l + offset).view(-1), (next_dist * (u.float() - b)).view(-1))
             proj_dist.view(-1).index_add_(0, (u + offset).view(-1), (next_dist * (b - l.float())).view(-1))
 
-        dist = self.policy_net(state_batch)
-        log_p = torch.log(dist[range(batch_size), action_batch])
+        dist = self.policy_net.dist(state_batch)
+        log_p = torch.log(dist[range(batch_size), action_batch.squeeze(1)])
         elementwise_loss = -(proj_dist * log_p).sum(1)
 
         loss = torch.mean(elementwise_loss * weights)
@@ -180,7 +184,7 @@ class Rainbow(DeepQLearning):
             return
         samples = self.memory.sample(batch_size, self.beta)
 
-        loss, elementwise_loss, indices = self._compute_loss(samples, batch_size, gamma)
+        loss, elementwise_loss, indices = self._compute_categorical_loss(samples, batch_size, gamma)
 
         self.losses.append(loss.item())
 
@@ -197,3 +201,6 @@ class Rainbow(DeepQLearning):
         loss_for_prior = elementwise_loss.detach().cpu().numpy()
         new_priorities = loss_for_prior + self.prior_eps
         self.memory.update_priorities(indices, new_priorities)
+
+        self.policy_net.reset_noise()
+        self.target_net.reset_noise()

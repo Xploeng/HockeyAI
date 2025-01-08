@@ -140,11 +140,13 @@ class NoisyCategoricalDueling(torch.nn.Module):
     def __init__(self, n_actions, n_observations, hidden_size, atom_size, v_min, v_max):
         super().__init__()
 
-        self.support = torch.linspace(v_min, v_max, atom_size)
+        self.in_dim = n_observations
+        self.out_dim = n_actions
+        self.support = torch.linspace(v_min, v_max, atom_size).to("cpu")
         self.atom_size = atom_size
         # common feature layer
         self.feature_layer = torch.nn.Sequential(
-            torch.nn.Linear(n_observations, hidden_size),
+            torch.nn.Linear(self.in_dim, hidden_size),
             torch.nn.ReLU(),
         )
 
@@ -154,7 +156,7 @@ class NoisyCategoricalDueling(torch.nn.Module):
 
         # advantage layer
         self.advantage_hidden_layer = NoisyLinear(hidden_size, hidden_size)
-        self.advantage_layer = NoisyLinear(hidden_size, n_actions * atom_size)
+        self.advantage_layer = NoisyLinear(hidden_size, self.out_dim * atom_size)
 
     def forward(self, x):
         dist = self.dist(x)

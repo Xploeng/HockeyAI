@@ -4,7 +4,7 @@
 defaults:
   - override /agent: rainbow
   - override /memory: prioritized_buffer
-  - override /network: noisy_duel
+  - override /network: noisy_cat_duel
 
 env: Pendulum-v1
 

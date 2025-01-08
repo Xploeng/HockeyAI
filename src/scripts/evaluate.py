@@ -87,7 +87,7 @@ def evaluate_model(cfg: DictConfig) -> None:
     agent.memory.clear()
 
     # Plot the Q-function for all state dimensions
-    plot_q_function_all_dims(agent, cfg.env, figures_dir)
+    # plot_q_function_all_dims(agent, cfg.env, figures_dir)
 
     # Start the evaluation
     all_episode_stats = {}

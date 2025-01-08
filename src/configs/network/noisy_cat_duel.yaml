@@ -1,4 +1,4 @@
-_target_: utils.DuelingQNetwork
+_target_: utils.NoisyCategoricalDueling
 hidden_size: 128
 atom_size: 51
 v_min: -10
