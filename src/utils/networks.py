@@ -19,8 +19,6 @@ class DQN(nn.Module):
         return self.fc3(x)
 
     def max_q(self, observations):
-        # compute the maximal Q-value
-        # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values.detach().numpy()
@@ -98,8 +96,6 @@ class Actor(nn.Module):
         return x
 
     def max_q(self, observations):
-        # compute the maximal Q-value
-        # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values.detach().numpy()

@@ -1,12 +1,14 @@
 import sys
+import hydra
 import torch
+
+from gymnasium import spaces
 
 from .agent import Agent
 
 
 sys.path.append("src/")
-from utils.networks import Actor, Critic
-from utils.replay import Transition
+from utils.replay import ReplayMemory, Transition
 
 
 class DDPG(Agent):
@@ -14,36 +16,69 @@ class DDPG(Agent):
         self,
         env,
         memory,
-        hidden_size=256,
-        actor_lr=1e-4,
-        critic_lr=1e-3,
-        gamma=0.99,
-        tau=0.005,
-        device="cpu",
-        **kwargs,
+        network,
+        training,
+        device=torch.device("cuda:0"),
+        bins=100,
+        **_,
     ):
-        super().__init__(env, memory, device)
-        self.gamma = gamma
-        self.tau = tau
+        super().__init__()
+        self.env = env
+        self.device = device
 
-        # Actor and Critic Networks
-        self.actor = Actor(env.observation_space.shape[0], hidden_size, env.action_space.shape[0]).to(device)
-        self.actor_target = Actor(env.observation_space.shape[0], hidden_size, env.action_space.shape[0]).to(device)
-        self.critic = Critic(env.observation_space.shape[0] + env.action_space.shape[0], hidden_size, 1).to(device)
-        self.critic_target = Critic(env.observation_space.shape[0] + env.action_space.shape[0], hidden_size, 1).to(
-            device,
-        )
+        # Parse memory, network, and training configurations
+        self.memory_cfg = memory
+        self.network_cfg = network
+        self.training_cfg = training
+        self.memory = ReplayMemory(self.memory_cfg.capacity)
+
+        # Determine action and observation spaces
+        n_actions = env.action_space.shape[0] if isinstance(env.action_space, spaces.Box) else bins
+        n_observations = env.observation_space.shape[0]
+
+        # Initialize actor and critic networks
+        self.actor = hydra.utils.instantiate(
+            config=self.network_cfg.actor,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+
+        self.actor_target = hydra.utils.instantiate(
+            config=self.network_cfg.actor,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+
+        self.critic = hydra.utils.instantiate(
+            config=self.network_cfg.critic,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
+
+        self.critic_target = hydra.utils.instantiate(
+            config=self.network_cfg.critic,
+            n_observations=n_observations,
+            n_actions=n_actions,
+        ).to(self.device)
 
         # Synchronize target networks
         self._sync_target_networks()
 
-        # Optimizers
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
+        # Optimizers and loss
+        self.actor_optimizer = hydra.utils.instantiate(
+            config=self.training_cfg.actor_optimizer,
+            params=self.actor.parameters(),
+        )
 
-        self.criterion = torch.nn.MSELoss()
+        self.critic_optimizer = hydra.utils.instantiate(
+            config=self.training_cfg.critic_optimizer,
+            params=self.critic.parameters(),
+        )
+
+        self.criterion = hydra.utils.instantiate(config=self.training_cfg.criterion)
 
     def _sync_target_networks(self):
+        """Synchronize the target networks with the main networks."""
         for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
             target_param.data.copy_(param.data)
 
@@ -51,14 +86,17 @@ class DDPG(Agent):
             target_param.data.copy_(param.data)
 
     def select_action(self, state):
+        """Select an action using the actor network."""
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
         action = self.actor(state).detach().cpu().numpy()[0]
         return action
 
     def record(self, state, action, next_state, reward, done):
+        """Record the transition in the replay memory."""
         self.memory.push(state, action, next_state, reward, done)
 
     def optimize(self, batch_size):
+        """Optimize the actor and critic networks."""
         if len(self.memory) < batch_size:
             return
 
@@ -75,7 +113,7 @@ class DDPG(Agent):
         with torch.no_grad():
             target_actions = self.actor_target(next_states)
             target_q = self.critic_target(next_states, target_actions)
-            q_target = rewards + self.gamma * target_q * (1 - dones)
+            q_target = rewards + self.training_cfg.gamma * target_q * (1 - dones)
         q_values = self.critic(states, actions)
         critic_loss = self.criterion(q_values, q_target)
 
@@ -90,14 +128,16 @@ class DDPG(Agent):
         self.actor_optimizer.step()
 
         # Soft update target networks
-        self._soft_update(self.actor_target, self.actor)
-        self._soft_update(self.critic_target, self.critic)
+        self._soft_update(self.actor_target, self.actor, self.training_cfg.tau)
+        self._soft_update(self.critic_target, self.critic, self.training_cfg.tau)
 
-    def _soft_update(self, target, source):
+    def _soft_update(self, target, source, tau):
+        """Soft update target network parameters."""
         for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1.0 - self.tau) * target_param.data)
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
 
     def load_state_dict(self, checkpoint):
+        """Load the model and optimizer state dictionaries."""
         self.actor.load_state_dict(checkpoint["actor_state_dict"])
         self.actor_target.load_state_dict(checkpoint["actor_target_state_dict"])
         self.critic.load_state_dict(checkpoint["critic_state_dict"])
@@ -106,6 +146,7 @@ class DDPG(Agent):
         self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer_state_dict"])
 
     def state_dict(self):
+        """Return the model and optimizer state dictionaries."""
         return {
             "actor_state_dict": self.actor.state_dict(),
             "actor_target_state_dict": self.actor_target.state_dict(),
