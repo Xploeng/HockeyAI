@@ -134,3 +134,58 @@ class NoisyDueling(torch.nn.Module):
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values[0].detach().numpy()
+
+
+class NoisyCategoricalDueling(torch.nn.Module):
+    def __init__(self, n_actions, n_observations, hidden_size, atom_size, v_min, v_max):
+        super().__init__()
+
+        self.support = torch.linspace(v_min, v_max, atom_size)
+        self.atom_size = atom_size
+        # common feature layer
+        self.feature_layer = torch.nn.Sequential(
+            torch.nn.Linear(n_observations, hidden_size),
+            torch.nn.ReLU(),
+        )
+
+        # value layer
+        self.value_hidden_layer = NoisyLinear(hidden_size, hidden_size)
+        self.value_layer = NoisyLinear(hidden_size, atom_size)
+
+        # advantage layer
+        self.advantage_hidden_layer = NoisyLinear(hidden_size, hidden_size)
+        self.advantage_layer = NoisyLinear(hidden_size, n_actions * atom_size)
+
+    def forward(self, x):
+        dist = self.dist(x)
+
+        q_values = torch.sum(dist * self.support, dim=2)
+
+        return q_values
+
+    def dist(self, x):
+        """Get the distribution of atoms."""
+        feature = self.feature_layer(x)
+        adv_hid = torch.nn.functional.relu(self.advantage_hidden_layer(feature))
+        val_hid = torch.nn.functional.relu(self.value_hidden_layer(feature))
+
+        advantage = self.advantage_layer(adv_hid).view(-1, self.out_dim, self.atom_size)
+        value = self.value_layer(val_hid).view(-1, 1, self.atom_size)
+        q_atoms = value + advantage - advantage.mean(dim=1, keepdim=True)
+
+        dist = torch.nn.functional.softmax(q_atoms, dim=-1)
+        dist = dist.clamp(min=1e-3)  # for avoiding nans
+
+        return dist
+
+    def reset_noise(self):
+        for module in self.children():
+            if hasattr(module, "reset_noise"):
+                module.reset_noise()
+
+    def max_q(self, observations):
+        # compute the maximal Q-value
+        # Complete this
+        observations = torch.from_numpy(observations.astype(np.float32))
+        q_values = self.forward(observations)
+        return torch.max(q_values, dim=1).values[0].detach().numpy()

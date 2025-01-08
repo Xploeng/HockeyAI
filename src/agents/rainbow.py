@@ -46,14 +46,11 @@ class Rainbow(DeepQLearning):
         self.prior_eps = prior_eps
         self.episodes = episodes
 
-    def optimize(self, batch_size, gamma, tau, episode, **_):
-        # Timing the different components
-        start_time = time.time()
+    def select_action(self, state):
+        self.steps_done += 1
+        return self.policy_net(state).max(1).indices.view(1, 1)
 
-        # Sample from memory
-        if len(self.memory) < batch_size:
-            return
-        samples = self.memory.sample(batch_size, self.beta)
+    def _compute_categorical_loss(self, samples, batch_size, gamma):
         transitions, weights, indices = (
             samples["transitions"],
             samples["weights"],
@@ -65,15 +62,8 @@ class Rainbow(DeepQLearning):
             dtype=torch.float32,
         ).unsqueeze(1)
 
-        sample_time = time.time()
-
-        # Increase beta
-        fraction = min(episode / self.episodes, 1.0)
-        self.beta = self.beta + fraction * (1.0 - self.beta)
-
         # Transpose the batch
         batch = Transition(*zip(*transitions))
-
         # Compute a mask of non-final states and concatenate the batch elements
         non_final_mask = torch.tensor(
             tuple(map(lambda s: s is not None, batch.next_state)),
@@ -88,7 +78,67 @@ class Rainbow(DeepQLearning):
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
-        transpose_time = time.time()
+        # Categorical loss
+        delta_z = float(self.v_max - self.v_min) / (self.atom_size - 1)
+
+        with torch.no_grad():
+            next_action = self.policy_net(non_final_next_states).argmax(1)
+            next_dist = self.target_net.dist(non_final_next_states)
+            next_dist = next_dist[range(batch_size), next_action]
+
+            t_z = reward_batch[non_final_mask] * gamma * self.support
+            t_z = t_z.clamp(min=self.v_min, max=self.v_max)
+            b = (t_z - self.v_min) / delta_z
+            l = b.floor().long()
+            u = b.ceil().long()
+
+            offset = (
+                torch.linspace(0, (self.batch_size - 1) * self.atom_size, self.batch_size)
+                .long()
+                .unsqueeze(1)
+                .expand(self.batch_size, self.atom_size)
+                .to(self.device)
+            )
+
+            proj_dist = torch.zeros(next_dist.size(), device=self.device)
+            proj_dist.view(-1).index_add_(0, (l + offset).view(-1), (next_dist * (u.float() - b)).view(-1))
+            proj_dist.view(-1).index_add_(0, (u + offset).view(-1), (next_dist * (b - l.float())).view(-1))
+
+        dist = self.policy_net(state_batch)
+        log_p = torch.log(dist[range(batch_size), action_batch])
+        elementwise_loss = -(proj_dist * log_p).sum(1)
+
+        loss = torch.mean(elementwise_loss * weights)
+
+        return loss, elementwise_loss, indices
+
+    def _compute_loss(self, samples, batch_size, gamma):
+        transitions, weights, indices = (
+            samples["transitions"],
+            samples["weights"],
+            samples["indices"],
+        )
+        weights = torch.tensor(
+            weights,
+            device=self.device,
+            dtype=torch.float32,
+        ).unsqueeze(1)
+
+        # Transpose the batch
+        batch = Transition(*zip(*transitions))
+        # Compute a mask of non-final states and concatenate the batch elements
+        non_final_mask = torch.tensor(
+            tuple(map(lambda s: s is not None, batch.next_state)),
+            device=self.device,
+            dtype=torch.bool,
+        )
+        non_final_next_states = torch.cat(
+            [s for s in batch.next_state if s is not None],
+        )
+
+        state_batch = torch.cat(batch.state)
+        action_batch = torch.cat(batch.action)
+        reward_batch = torch.cat(batch.reward)
 
         # Compute Q(s_t, a)
         state_action_values = self.policy_net(state_batch).gather(1, action_batch)
@@ -109,14 +159,28 @@ class Rainbow(DeepQLearning):
 
         expected_state_action_values = (next_state_values * gamma) + reward_batch
 
-        compute_q_time = time.time()
-
         # Compute loss
         elementwise_loss = self.criterion(
             state_action_values,
             expected_state_action_values.unsqueeze(1),
         )
-        loss = torch.mean(elementwise_loss * weights)
+        loss: torch.Tensor = torch.mean(elementwise_loss * weights)
+
+        return loss, elementwise_loss, indices
+
+    def optimize(self, batch_size, gamma, tau, episode, **_):
+        # Timing the different components
+
+        # Increase beta
+        fraction = min(episode / self.episodes, 1.0)
+        self.beta = self.beta + fraction * (1.0 - self.beta)
+
+        # Sample from memory
+        if len(self.memory) < batch_size:
+            return
+        samples = self.memory.sample(batch_size, self.beta)
+
+        loss, elementwise_loss, indices = self._compute_loss(samples, batch_size, gamma)
 
         self.losses.append(loss.item())
 
@@ -126,30 +190,10 @@ class Rainbow(DeepQLearning):
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
-        compute_loss_time = time.time()
-
         # Update target network
         self.update_target(tau=tau)
-
-        update_target_time = time.time()
 
         # PER: update priorities
         loss_for_prior = elementwise_loss.detach().cpu().numpy()
         new_priorities = loss_for_prior + self.prior_eps
         self.memory.update_priorities(indices, new_priorities)
-
-        update_priority_time = time.time()
-
-        # # Write timings to file
-        # with open(
-        #     "/home/jules/Documents/Uni/3.Semester/RL/HockeyAI/timings.txt",
-        #     "a",
-        # ) as f:
-        #     f.write(f"Sample time: {sample_time - start_time}\n")
-        #     f.write(f"Transpose time: {transpose_time - sample_time}\n")
-        #     f.write(f"Compute Q time: {compute_q_time - transpose_time}\n")
-        #     f.write(f"Compute loss time: {compute_loss_time - compute_q_time}\n")
-        #     f.write(f"Update Target time: {update_target_time - compute_loss_time}\n")
-        #     f.write(
-        #         f"Update priorities time: {update_priority_time - update_target_time}\n\n"
-        #     )

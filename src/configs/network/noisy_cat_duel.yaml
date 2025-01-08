@@ -1,0 +1,5 @@
+_target_: utils.DuelingQNetwork
+hidden_size: 128
+atom_size: 51
+v_min: -10
+v_max: 10
