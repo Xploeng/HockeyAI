@@ -4,3 +4,4 @@ name: DQL
 eps_start: 0.9
 eps_end: 0.05
 eps_decay: 1000
+requires_continues_action_space: False

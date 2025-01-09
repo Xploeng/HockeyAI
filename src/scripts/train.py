@@ -1,8 +1,5 @@
 import os
 import sys
-import threading
-
-from copy import deepcopy
 import gymnasium as gym
 import hydra
 import numpy as np
@@ -10,166 +7,97 @@ import torch
 import torch.utils.tensorboard as tb
 
 from gymnasium import spaces
+from omegaconf import DictConfig
 from tqdm import tqdm
 
 
 sys.path.append("src/")
 from agents import Agent
-from utils import DiscreteActionWrapper, ReplayMemory, write_checkpoint
+from utils.helper import DiscreteActionWrapper, load_checkpoint, save_checkpoint
 
 
-@hydra.main(config_path="../configs/", config_name="config", version_base=None)
-def run_training(cfg):
-
-    device = torch.device(cfg.device)
-    print(f"\nDevice: {device}")
-    print(f"Environment: {cfg.env}")
-    print(f"Agent: {cfg.agent.name} of type {cfg.agent._target_}")
-
+def initialize_environment(cfg: DictConfig) -> gym.Env:
     env = gym.make(cfg.env)
     env = gym.wrappers.RecordEpisodeStatistics(env)
 
-    if isinstance(env.action_space, spaces.Box):
-        n_actions = cfg.bins
-        env = DiscreteActionWrapper(env, bins=cfg.bins)
-    elif isinstance(env.action_space, spaces.Discrete):
-        n_actions = env.action_space.n
-    if isinstance(env.observation_space, spaces.Box):
-        n_oberservations = env.observation_space.shape[0]
-    else:
-        state, info = env.reset()
-        n_oberservations = len(state)
+    # Check if env continuous and agent not continuous -> wrap env
+    agent_continuous = cfg.agent.requires_continues_action_space
+    if isinstance(env.action_space, spaces.Box) and not agent_continuous:
+        env = DiscreteActionWrapper(env, bins=cfg.agent.bins)
+    elif isinstance(env.action_space, spaces.Discrete) and agent_continuous:
+        raise ValueError(
+            f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
+        )
+    return env
+
+
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
+    agent_continuous = cfg.agent.requires_continues_action_space
+    env_continuous = isinstance(env.action_space, spaces.Box)
+    if agent_continuous and not env_continuous:
+        raise ValueError("The agent requires a continuous action space, but the environment has a discrete one.")
+
+    agent: Agent = hydra.utils.instantiate(
+        config=cfg.agent,
+        env=env,
+        device=device,
+        recursive=False,
+    )
+
+    start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
+
+    return agent, start_episode
+
+
+@hydra.main(config_path="../configs/", config_name="config", version_base=None)
+def run_training(cfg: DictConfig):
+    """
+    Orchestrates the training process for the specified number of episodes.
+
+    Args:
+        cfg (object): Configuration object containing training parameters.
+        agent (object): The agent to train.
+        env (object): The environment in which the agent operates.
+        device (str): The device for computation (CPU/GPU).
+
+    Returns:
+        None
+    """
+    writer = tb.SummaryWriter(log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"))
 
     if cfg.seed:
         np.random.seed(cfg.seed)
         torch.manual_seed(cfg.seed)
 
-    # Initialize the replay buffer
-    memory: ReplayMemory = hydra.utils.instantiate(config=cfg.memory)
+    device = torch.device(cfg.device)
+    print(f"Using device: {device}")
 
-    # Initialize the policy and target network
-    policy_net = hydra.utils.instantiate(
-        config=cfg.network,
-        n_observations=n_oberservations,
-        n_actions=n_actions,
-    ).to(device=device)
-    target_net = hydra.utils.instantiate(
-        config=cfg.network,
-        n_observations=n_oberservations,
-        n_actions=n_actions,
-    ).to(device=device)
-    target_net.load_state_dict(policy_net.state_dict())
-
-    # Initialize the optimizer
-    optimizer = hydra.utils.instantiate(
-        config=cfg.training.optimizer,
-        params=policy_net.parameters(),
-    )
-    # Initialize the loss function
-    criterion = hydra.utils.instantiate(config=cfg.training.criterion)
-
-    # Initialize the agent
-    agent: Agent = hydra.utils.instantiate(
-        config=cfg.agent,
-        n_actions=n_actions,
-        n_observations=n_oberservations,
-        policy_net=policy_net,
-        target_net=target_net,
-        optimizer=optimizer,
-        criterion=criterion,
-        memory=memory,
-        env=env,
-        device=device,
-        episodes=cfg.training.episodes,
-    )
-
-    # Load checkpoint from file to continue training or initialize training scalars
     checkpoint_path = os.path.join(
         "src/outputs",
         cfg.agent.name,
         "checkpoints",
         f"{cfg.agent.name}_last.ckpt",
     )
-    if cfg.training.continue_training:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        agent.load_state_dict(**checkpoint)
-        start_episode = checkpoint["episode"]
-    else:
-        start_episode = 0
 
-    # Write the model configurations to the model save path
-    os.makedirs(os.path.join("src/outputs", cfg.agent.name), exist_ok=True)
+    env = initialize_environment(cfg)
+    agent, start_episode = initialize_agent(cfg, env, device, checkpoint_path)
 
-    # Initialize tensorbaord to track scalars
-    writer = tb.SummaryWriter(
-        log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"),
-    )
+    print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
+    for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
+        episode += start_episode
 
-    # training loop
-    print("Starting training")
-    print(f"Training from {start_episode} to {cfg.training.episodes} episodes")
-    for episode in tqdm(range(start_episode, cfg.training.episodes)):
-        # Track the episode number and learning rate
-        writer.add_scalar(
-            tag="Episode",
-            scalar_value=episode,
-            global_step=agent.steps_done,
-        )
-        writer.add_scalar(
-            tag="Learning Rate",
-            scalar_value=optimizer.state_dict()["param_groups"][0]["lr"],
-            global_step=agent.steps_done,
-        )
+        agent.train_episode()
 
-        # Initialize the environment and get its state
-        state, info = env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        done = False
-        while not done:
-            action = agent.select_action(state)
-            observation, reward, terminated, truncated, _ = env.step(action.item())
-            reward = torch.tensor([reward], device=device)
-            done = terminated or truncated
+        loss = agent.losses[-1] if agent.losses else 0
+        writer.add_scalar("Loss", loss, global_step=agent.steps_done)
+        writer.add_scalar("Episode", episode, global_step=agent.steps_done)
 
-            if terminated:
-                next_state = None
-            else:
-                next_state = torch.tensor(
-                    observation,
-                    dtype=torch.float32,
-                    device=device,
-                ).unsqueeze(0)
+        if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:
+            save_checkpoint(agent, checkpoint_path, episode)
 
-            # Store the transition in memory
-            agent.record(state, action, next_state, reward, done)
-
-            # Move to the next state
-            state = next_state
-
-            # Perform one step of the optimization (on the policy network)
-            agent.optimize(**cfg.training, episode=episode)
-
-            loss = agent.losses[-1] if len(agent.losses) > 0 else 0
-            writer.add_scalar(
-                tag="Loss",
-                scalar_value=loss,
-                global_step=agent.steps_done,
-            )
-        # Write checkpoint to file, using a separate thread
-        if cfg.training.save_agent and episode % cfg.training.save_interval == 0:
-            agent_cp, optimizer_cp = deepcopy(agent), deepcopy(optimizer)
-            thread = threading.Thread(
-                target=write_checkpoint,
-                args=(agent_cp, optimizer_cp, episode, checkpoint_path),
-            )
-            thread.start()
-    try:
-        thread.join()
-        writer.flush()
-        writer.close()
-        env.close()
-    except NameError:
-        pass
+    writer.flush()
+    writer.close()
+    env.close()
 
 
 if __name__ == "__main__":

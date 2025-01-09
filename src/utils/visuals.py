@@ -54,8 +54,8 @@ def plot_rewards(agent_out_dir: str, n_episodes: int = 1, show: bool = True) -> 
     ax.legend()
     plt.tight_layout()
 
-    figure_path = os.path.join(agent_out_dir, "figures", f"rewards_0:{episode}.png")
-    os.makedirs(os.path.dirname(figure_path), exist_ok=True)
+    figure_path = os.path.join(agent_out_dir, "figures", f"rewards_n={episode+1}.png")
+    print(f"Saving rewards plot to {figure_path}")
     plt.savefig(figure_path, bbox_inches="tight")
 
     if show:
