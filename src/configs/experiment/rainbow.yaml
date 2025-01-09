@@ -3,24 +3,19 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-  - override /memory: prioritized_buffer
-  - override /network: noisy_cat_duel
 
 env: Pendulum-v1
 
 agent:
-  name: rainbow_duel_noisy
-  eps_start: 0.9
-  eps_end: 0.05
-  eps_decay: 1000
+  name: rainbow
 
-network:
-  hidden_size: 128
+  network:
+    hidden_size: 256
 
-training:
-  criterion: 
-    reduction: 'none'
-  episodes: 150
-  batch_size: 128
-  save_agent: True
-  continue_training: False
+  training:
+    criterion: 
+      reduction: 'none'
+    episodes: 300
+    batch_size: 128
+    save_agent: True
+    continue_training: False

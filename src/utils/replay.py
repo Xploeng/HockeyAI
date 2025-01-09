@@ -66,7 +66,7 @@ class PrioritizedReplayMemory(ReplayMemory):
     https://github.com/Curt-Park/rainbow-is-all-you-need/blob/master/03.per.ipynb
     """
 
-    def __init__(self, capacity, alpha=0.6):
+    def __init__(self, capacity, alpha=0.6, **_):
         super().__init__(capacity)
         self.alpha = alpha
         self.max_priority, self.tree_ptr = 1.0, 0
@@ -149,7 +149,7 @@ class NStepBuffer:
 
         self.n_step_buffer = deque(maxlen=self.n_steps)
 
-    def store(self, *args) -> Transition:
+    def push(self, *args) -> Transition:
         transition = Transition(*args)
         self.n_step_buffer.append(transition)
 
@@ -161,7 +161,7 @@ class NStepBuffer:
         reward, next_state, done = self._get_n_step_info(self.n_step_buffer, self.gamma)
         state, action = self.n_step_buffer[0][:2]
 
-        self.memory.push(Transition(state, action, next_state, reward, done))
+        self.memory.push(*(state, action, next_state, reward, done))
 
         return self.n_step_buffer[0]
 
@@ -169,7 +169,7 @@ class NStepBuffer:
         return self.memory.sample()
 
     def sample_batch_from_idxs(self, idxs: np.ndarray) -> dict:
-        return self.memory[idxs]
+        return dict(transitions=self.memory[idxs])
 
     def _get_n_step_info(self, n_step_buffer: deque, gamma: float):
         """Return n step reward, next_state, and done."""
@@ -177,7 +177,7 @@ class NStepBuffer:
         _, _, next_state, reward, done = n_step_buffer[-1]
 
         for transition in reversed(list(n_step_buffer)[:-1]):
-            _, _, r, n_s, d = transition
+            _, _, n_s, r, d = transition
 
             reward = r + gamma * reward * (1 - d)
             next_state, done = (n_s, d) if d else (next_state, done)

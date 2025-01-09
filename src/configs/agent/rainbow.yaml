@@ -1,6 +1,13 @@
+defaults: 
+  - memory: prioritized_buffer
+  - memory@n_memory: n_step_buffer
+  - network: noisy_cat_duel
+  - training: default
+
+bins: 100
+
 # type: DQL Agent
 _target_: agents.Rainbow
+_recursive_: False
 name: Rainbow
-eps_start: 0.9
-eps_end: 0.05
-eps_decay: 1000
+requires_continues_action_space: False

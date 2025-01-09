@@ -7,7 +7,7 @@ from torchrl.modules import NoisyLinear
 
 
 class DQN(nn.Module):
-    def __init__(self, n_actions, n_observations, hidden_size):
+    def __init__(self, n_actions, n_observations, hidden_size, **_):
         super().__init__()
         self.fc1 = nn.Linear(n_observations, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
@@ -27,7 +27,7 @@ class DQN(nn.Module):
 
 
 class DuelingQNetwork(torch.nn.Module):
-    def __init__(self, n_actions, n_observations, hidden_size):
+    def __init__(self, n_actions, n_observations, hidden_size, **_):
         super().__init__()
 
         # feature layer
@@ -106,7 +106,7 @@ class Actor(nn.Module):
 
 
 class NoisyDQN(torch.nn.Module):
-    def __init__(self, n_actions, n_observations, hidden_size):
+    def __init__(self, n_actions, n_observations, hidden_size, **_):
         super().__init__()
         self.feature = torch.nn.Linear(n_observations, hidden_size)
         self.noisy1 = NoisyLinear(hidden_size, hidden_size)
@@ -130,7 +130,7 @@ class NoisyDQN(torch.nn.Module):
 
 
 class NoisyDueling(torch.nn.Module):
-    def __init__(self, n_actions, n_observations, hidden_size):
+    def __init__(self, n_actions, n_observations, hidden_size, **_):
         super().__init__()
         # feature layer
         self.feature_layer = torch.nn.Sequential(
@@ -176,12 +176,12 @@ class NoisyDueling(torch.nn.Module):
 
 
 class NoisyCategoricalDueling(torch.nn.Module):
-    def __init__(self, n_actions, n_observations, hidden_size, atom_size, v_min, v_max):
+    def __init__(self, n_actions, n_observations, hidden_size, atom_size, support, **_):
         super().__init__()
 
         self.in_dim = n_observations
         self.out_dim = n_actions
-        self.support = torch.linspace(v_min, v_max, atom_size).to("cpu")
+        self.support = support
         self.atom_size = atom_size
         # common feature layer
         self.feature_layer = torch.nn.Sequential(
@@ -197,7 +197,8 @@ class NoisyCategoricalDueling(torch.nn.Module):
         self.advantage_hidden_layer = NoisyLinear(hidden_size, hidden_size)
         self.advantage_layer = NoisyLinear(hidden_size, self.out_dim * atom_size)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        assert x.dtype == torch.float32, f"Input must be a float tensor but got {x.dtype}"
         dist = self.dist(x)
 
         q_values = torch.sum(dist * self.support, dim=2)
