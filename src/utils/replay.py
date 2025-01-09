@@ -1,6 +1,6 @@
 import random
 
-from collections import namedtuple
+from collections import deque, namedtuple
 import numpy as np
 import torch
 
@@ -137,3 +137,52 @@ class PrioritizedReplayMemory(ReplayMemory):
         weight = weight / max_weight
 
         return weight
+
+
+class NStepBuffer:
+    def __init__(self, capacity: int, n_steps: int, gamma: float):
+        self.capacity = capacity
+        self.n_steps = n_steps
+        self.gamma = gamma
+
+        self.memory = ReplayMemory(capacity)
+
+        self.n_step_buffer = deque(maxlen=self.n_steps)
+
+    def store(self, *args) -> Transition:
+        transition = Transition(*args)
+        self.n_step_buffer.append(transition)
+
+        # single step transition is not ready
+        if len(self.n_step_buffer) < self.n_steps:
+            return
+
+        # make a n-step transition
+        reward, next_state, done = self._get_n_step_info(self.n_step_buffer, self.gamma)
+        state, action = self.n_step_buffer[0][:2]
+
+        self.memory.push(Transition(state, action, next_state, reward, done))
+
+        return self.n_step_buffer[0]
+
+    def sample_batch(self):
+        return self.memory.sample()
+
+    def sample_batch_from_idxs(self, idxs: np.ndarray) -> dict:
+        return self.memory[idxs]
+
+    def _get_n_step_info(self, n_step_buffer: deque, gamma: float):
+        """Return n step reward, next_state, and done."""
+        # info of the last transition
+        _, _, next_state, reward, done = n_step_buffer[-1]
+
+        for transition in reversed(list(n_step_buffer)[:-1]):
+            _, _, r, n_s, d = transition
+
+            reward = r + gamma * reward * (1 - d)
+            next_state, done = (n_s, d) if d else (next_state, done)
+
+        return reward, next_state, done
+
+    def __len__(self) -> int:
+        return self.memory.size

@@ -5,7 +5,6 @@ from .dql import DeepQLearning
 
 
 sys.path.append("src/")
-import time
 from utils.replay import Transition
 
 
@@ -93,7 +92,7 @@ class Rainbow(DeepQLearning):
             t_z = reward_batch[non_final_mask].unsqueeze(-1) + gamma * self.support
             t_z = t_z.clamp(min=self.v_min, max=self.v_max)
             b = (t_z - self.v_min) / delta_z
-            l = b.floor().long()
+            l = b.floor().long()  # noqa: E741
             u = b.ceil().long()
 
             offset = (
