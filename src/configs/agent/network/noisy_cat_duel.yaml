@@ -1,0 +1,5 @@
+_target_: utils.NoisyCategoricalDueling
+hidden_size: 128
+atom_size: 51
+v_min: 0.0
+v_max: 200.0

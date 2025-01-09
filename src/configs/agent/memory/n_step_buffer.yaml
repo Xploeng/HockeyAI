@@ -1,0 +1,4 @@
+_target_: utils.NStepBuffer
+capacity: 10000
+n_steps: 3
+gamma: 0.99

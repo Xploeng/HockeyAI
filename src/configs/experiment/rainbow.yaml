@@ -1,0 +1,21 @@
+# @package _global_
+
+# Override entire configuration yaml files
+defaults:
+  - override /agent: rainbow
+
+env: Pendulum-v1
+
+agent:
+  name: rainbow
+
+  network:
+    hidden_size: 256
+
+  training:
+    criterion: 
+      reduction: 'none'
+    episodes: 300
+    batch_size: 128
+    save_agent: True
+    continue_training: False

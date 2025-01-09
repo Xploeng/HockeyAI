@@ -35,9 +35,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
-        raise ValueError(
-            "The agent requires a continuous action space, but the environment has a discrete one."
-            )
+        raise ValueError("The agent requires a continuous action space, but the environment has a discrete one.")
 
     agent: Agent = hydra.utils.instantiate(
         config=cfg.agent,
@@ -49,6 +47,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
 
     return agent, start_episode
+
 
 @hydra.main(config_path="../configs/", config_name="config", version_base=None)
 def run_training(cfg: DictConfig):

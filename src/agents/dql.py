@@ -84,7 +84,7 @@ class DeepQLearning(Agent):
     def optimize(self, batch_size, gamma, tau, **_):
         if len(self.memory) < batch_size:
             return
-        transitions = self.memory.sample(batch_size)
+        transitions = self.memory.sample(batch_size)["transitions"]
 
         batch = Transition(*zip(*transitions))
 
@@ -109,9 +109,7 @@ class DeepQLearning(Agent):
         # Compute V(s_{t+1}) for all next states.
         next_state_values = torch.zeros(batch_size, device=self.device)
         with torch.no_grad():
-            next_state_values[non_final_mask] = (
-                self.target_net(non_final_next_states).max(1).values
-            )
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
 
         expected_state_action_values = (next_state_values * gamma) + reward_batch
 
@@ -134,9 +132,7 @@ class DeepQLearning(Agent):
         target_net_state_dict = self.target_net.state_dict()
         policy_net_state_dict = self.policy_net.state_dict()
         for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[
-                key
-            ] * tau + target_net_state_dict[key] * (1 - tau)
+            target_net_state_dict[key] = policy_net_state_dict[key] * tau + target_net_state_dict[key] * (1 - tau)
         self.target_net.load_state_dict(target_net_state_dict)
 
     def train_episode(self) -> None:
