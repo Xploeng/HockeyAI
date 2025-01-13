@@ -17,11 +17,15 @@ class Agent(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def optimize(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def train_episode(self):
         raise NotImplementedError
 
     @abstractmethod
-    def optimize(self):
+    def evaluate_episode(self):
         raise NotImplementedError
 
     @abstractmethod

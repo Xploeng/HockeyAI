@@ -1,0 +1,2 @@
+_target_: utils.Actor
+hidden_size: 128

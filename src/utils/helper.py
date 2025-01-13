@@ -46,7 +46,7 @@ def save_checkpoint(agent, checkpoint_path, episode):
     agent_cp = deepcopy(agent)
     thread = threading.Thread(
         target=write_checkpoint,
-        args=(agent_cp, agent.optimizer, episode, checkpoint_path),
+        args=(agent_cp, episode, checkpoint_path),
     )
     thread.start()
     thread.join()
@@ -54,7 +54,6 @@ def save_checkpoint(agent, checkpoint_path, episode):
 
 def write_checkpoint(
     agent,
-    optimizer,
     episode: int,
     dst_path: str,
 ):
@@ -71,7 +70,6 @@ def write_checkpoint(
     torch.save(
         obj={
             "agent_state_dict": agent.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
             "episode": episode + 1,
         },
         f=dst_path,

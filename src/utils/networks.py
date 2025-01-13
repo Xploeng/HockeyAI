@@ -19,8 +19,6 @@ class DQN(nn.Module):
         return self.fc3(x)
 
     def max_q(self, observations):
-        # compute the maximal Q-value
-        # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values.detach().numpy()
@@ -81,7 +79,7 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, learning_rate=3e-4):
+    def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -98,8 +96,6 @@ class Actor(nn.Module):
         return x
 
     def max_q(self, observations):
-        # compute the maximal Q-value
-        # Complete this
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values.detach().numpy()

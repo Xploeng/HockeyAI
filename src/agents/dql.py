@@ -6,6 +6,7 @@ import hydra
 import torch
 
 from gymnasium import spaces
+from PIL import Image
 
 from .agent import Agent
 
@@ -84,7 +85,12 @@ class DeepQLearning(Agent):
     def optimize(self, batch_size, gamma, tau, **_):
         if len(self.memory) < batch_size:
             return
-        transitions = self.memory.sample(batch_size)["transitions"]
+        try:
+            transitions = self.memory.sample(batch_size)["transitions"]
+        except ValueError as e:
+            print(self.memory.size)
+            print(e)
+            return
 
         batch = Transition(*zip(*transitions))
 
@@ -156,24 +162,48 @@ class DeepQLearning(Agent):
 
             state = next_state
 
+    def evaluate_episode(self) -> tuple[list[Image.Image], dict]:
+        state, info = self.env.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        done = False
+        frames = []
+
+        while not done:
+
+            # Render the environment and save the frames
+            frame = self.env.render()
+            if frame is not None:
+                frames.append(Image.fromarray(frame))
+
+            # Action selection and recording the transition
+            action = self.select_action(state)
+            next_state, reward, terminated, truncated, info = self.env.step(action.item())
+            done = terminated or truncated
+
+            self.record(state, action, next_state, reward, done)
+
+            if not done:
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                state = next_state
+
+        return frames, info
+
     def load_state_dict(
         self,
         agent_state_dict,
-        optimizer_state_dict=None,
         episode=None,
         **_,
     ):
-        if self.target_net is not None:
-            self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
-
+        self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
         self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
+        self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
 
         self.memory = agent_state_dict["memory"]
         self.steps_done = len(self.memory)
-        if self.optimizer is not None and optimizer_state_dict is not None:
-            self.optimizer.load_state_dict(optimizer_state_dict)
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(
-            {"network_state_dict": self.policy_net.state_dict(), "memory": self.memory},
+            {"network_state_dict": self.policy_net.state_dict(),
+             "optimizer_state_dict": self.optimizer.state_dict(),
+             "memory": self.memory},
         )
