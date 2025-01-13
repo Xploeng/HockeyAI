@@ -1,38 +1,15 @@
 # @package _global_
 
+defaults:
+  - override /agent: ddpg
+
 env: Pendulum-v1
 
 agent:
-  _target_: "agents.DDPG"
   name: pendulum-ddpg
-  gamma: 0.99,
-  tau: 0.005,
-
-  memory:
-    capacity: 100000
-
-  network:
-    actor:
-      _target_: "utils.networks.Actor"
-      hidden_size: 256
-
-    critic:
-      _target_: "utils.networks.Critic"
-      hidden_size: 256
 
   training:
-    episodes: 100
-    batch_size: 128
+    episodes: 600
+    batch_size: 256
     save_agent: True
-    continue_training: True
-
-    actor_optimizer:
-      _target_: "torch.optim.AdamW"
-      lr: 1e-4
-      amsgrad: True
-
-
-    critic_optimizer:
-      _target_: "torch.optim.AdamW"
-      lr: 1e-3
-      amsgrad: True
+    continue_training: False

@@ -89,27 +89,7 @@ def evaluate_model(cfg: DictConfig) -> None:
     print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
     for episode in range(cfg.testing.episodes):
 
-        state, info = env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        done = False
-        frames = []
-
-        while not done:
-
-            # Render the environment and save the frames
-            frame = env.render()
-            if frame is not None:
-                frames.append(Image.fromarray(frame))
-
-            # Action selection and recording the transition
-            action = agent.select_action(state)
-            next_state, reward, terminated, truncated, info = env.step(action.item())
-            done = terminated or truncated
-            agent.record(state, action, next_state, reward, done)
-
-            if not done:
-                next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
-                state = next_state
+        frames, info = agent.evaluate_episode()
 
         # Keep track of episode statistics and save the animation
         rewards, states = agent.memory.rewards, agent.memory.states
