@@ -44,7 +44,7 @@ class ReplayMemory:
 
     @property
     def rewards(self) -> list[float]:
-        print(self.ptr)
+        # print(self.ptr)
         return [transition.reward for transition in self.memory[: self.ptr]]
 
     @property

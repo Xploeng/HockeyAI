@@ -222,21 +222,19 @@ class Rainbow(Agent):
     def load_state_dict(
         self,
         agent_state_dict,
-        optimizer_state_dict=None,
         episode=None,
         **_,
     ):
-        if self.target_net is not None:
-            self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
-
+        self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
         self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
+        self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
 
         self.memory = agent_state_dict["memory"]
         self.steps_done = len(self.memory)
-        if self.optimizer is not None and optimizer_state_dict is not None:
-            self.optimizer.load_state_dict(optimizer_state_dict)
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(
-            {"network_state_dict": self.policy_net.state_dict(), "memory": self.memory},
+            {"network_state_dict": self.policy_net.state_dict(),
+             "optimizer_state_dict": self.optimizer.state_dict(),
+             "memory": self.memory},
         )

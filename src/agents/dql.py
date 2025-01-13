@@ -85,7 +85,12 @@ class DeepQLearning(Agent):
     def optimize(self, batch_size, gamma, tau, **_):
         if len(self.memory) < batch_size:
             return
-        transitions = self.memory.sample(batch_size)["transitions"]
+        try:
+            transitions = self.memory.sample(batch_size)["transitions"]
+        except ValueError as e:
+            print(self.memory.size)
+            print(e)
+            return
 
         batch = Transition(*zip(*transitions))
 
@@ -174,6 +179,7 @@ class DeepQLearning(Agent):
             action = self.select_action(state)
             next_state, reward, terminated, truncated, info = self.env.step(action.item())
             done = terminated or truncated
+
             self.record(state, action, next_state, reward, done)
 
             if not done:
@@ -188,16 +194,12 @@ class DeepQLearning(Agent):
         episode=None,
         **_,
     ):
-        if self.target_net is not None:
-            self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
-
+        self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
         self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
+        self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
 
         self.memory = agent_state_dict["memory"]
         self.steps_done = len(self.memory)
-        optimizer_state_dict = agent_state_dict["optimizer_state_dict"]
-        if self.optimizer is not None and optimizer_state_dict is not None:
-            self.optimizer.load_state_dict(optimizer_state_dict)
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(

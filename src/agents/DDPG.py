@@ -1,3 +1,4 @@
+import collections
 import sys
 import numpy as np
 import torch
@@ -181,16 +182,22 @@ class DDPG(Agent):
         self.actor_optimizer.load_state_dict(agent_state_dict["actor_optimizer_state_dict"])
         self.critic_optimizer.load_state_dict(agent_state_dict["critic_optimizer_state_dict"])
 
+        self.memory = agent_state_dict["memory"]
+        self.steps_done = len(self.memory)
+
     def state_dict(self):
         """Return the model and optimizer state dictionaries."""
-        return {
+        return collections.OrderedDict(
+            {
             "actor_state_dict": self.actor.state_dict(),
             "actor_target_state_dict": self.actor_target.state_dict(),
             "critic_state_dict": self.critic.state_dict(),
             "critic_target_state_dict": self.critic_target.state_dict(),
             "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
             "critic_optimizer_state_dict": self.critic_optimizer.state_dict(),
-        }
+            "memory": self.memory,
+            },
+        )
 
 
 # Ornstein-Ulhenbeck Process
