@@ -64,11 +64,15 @@ class DDPG(Agent):
         self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=actor_learning_rate)
         self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=critic_learning_rate)
 
-    def select_action(self, state):
+    def select_action(self, state, action_space=None):
         """Select an action using the actor network."""
         state = Variable(torch.from_numpy(state).float().unsqueeze(0)).to(self.device)
         action = self.actor.forward(state)
         action = action.detach().cpu().numpy()[0, 0]
+
+        if action_space is not None:
+            return np.clip(action, action_space.low, action_space.high)
+
         return action
 
     def record(self, state, action, next_state, reward, done):
@@ -167,8 +171,8 @@ class DDPG(Agent):
                 frames.append(Image.fromarray(frame))
 
             # Action selection and recording the transition
-            action = self.select_action(state)
-            action = self.noise.select_action(action, step)
+            action = self.select_action(state, self.env.action_space)
+            # ! action = self.noise.select_action(action, step) No exploration noise during evaluation
             next_state, reward, terminated, truncated, info = self.env.step(action)
             done = terminated or truncated
 
@@ -210,7 +214,7 @@ class DDPG(Agent):
 # Ornstein-Ulhenbeck Process
 # Taken from #https://github.com/vitchyr/rlkit/blob/master/rlkit/exploration_strategies/ou_strategy.py
 class OUNoise:
-    def __init__(self, action_space, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.3, decay_period=100000):
+    def __init__(self, action_space, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.05, decay_period=1000):
         self.mu = mu
         self.theta = theta
         self.sigma = max_sigma
