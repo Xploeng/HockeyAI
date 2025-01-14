@@ -16,6 +16,9 @@ from utils.networks import Actor, Critic
 from utils.replay import ReplayMemory, Transition
 
 
+torch.autograd.set_detect_anomaly(True)
+
+
 class DDPG(Agent):
     def __init__(
         self,
@@ -92,21 +95,25 @@ class DDPG(Agent):
         next_states = torch.FloatTensor(np.array(batch.next_state)).to(self.device)
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
 
-        # Critic loss
-        q_values = self.critic(states, actions)
+        # Compute target Q values
         with torch.no_grad():
             target_actions = self.actor_target(next_states)
             target_q = self.critic_target(next_states, target_actions)
             q_target = rewards + self.gamma * target_q * (1 - dones)
-        critic_loss = self.criterion(q_values, q_target)
 
-        # Actor loss
-        policy_loss = -self.critic(states, self.actor(states)).mean()
+        # Compute current Q values
+        q_values = self.critic(states, actions)
+
+        # Critic loss
+        critic_loss = self.criterion(q_values, q_target)
 
         # Update Critic
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
+
+        # Actor loss
+        policy_loss = -self.critic(states, self.actor(states)).mean()
 
         # Update Actor
         self.actor_optimizer.zero_grad()

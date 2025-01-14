@@ -14,8 +14,8 @@ agent:
   tau: 1e-2
 
   training:
-    episodes: 30
+    episodes: 301
     batch_size: 256
     save_agent: True
-    save_interval: 5
-    continue_training: True
+    save_interval: 100
+    continue_training: False
