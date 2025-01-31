@@ -235,7 +235,7 @@ class Rainbow(Agent):
         self.policy_net.reset_noise()
         self.target_net.reset_noise()
 
-    def evaluate_episode(self) -> tuple[list[Image.Image], dict]:
+    def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict]:
         state, info = self.env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
         done = False
@@ -243,13 +243,21 @@ class Rainbow(Agent):
 
         while not done:
             # Render the environment and save the frames
-            frame = self.env.render()
+            frame = self.env.render(mode="rgb_array") if render else None
+
             if frame is not None:
                 frames.append(Image.fromarray(frame))
 
             # Action selection and recording the transition
             action = self.select_action(state)
-            next_state, reward, terminated, truncated, info = self.env.step(action.item())
+            opp_action = self.opponent.act(state.squeeze().cpu().numpy()) if self.hockey else None
+            if self.hockey:
+                act = self.env.discrete_to_continous_action(action.item())
+                act = np.hstack([act, opp_action])
+            else:
+                act = action.item()
+
+            next_state, reward, terminated, truncated, info = self.env.step(act)
             done = terminated or truncated
 
             self.record(state, action, next_state, reward, done)

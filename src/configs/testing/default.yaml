@@ -1,3 +1,5 @@
-episodes: 2
-episode_max_steps: 10
+episodes: 1
+episode_max_steps: 20
 show_figures: True
+hockey : False
+render: True
