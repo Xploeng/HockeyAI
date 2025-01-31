@@ -1,6 +1,7 @@
 import collections
 import sys
 import hydra
+import numpy as np
 import torch
 
 from gymnasium import spaces
@@ -17,6 +18,7 @@ class Rainbow(Agent):
     def __init__(
         self,
         env,
+        opponent,
         memory,
         network,
         training,
@@ -28,8 +30,15 @@ class Rainbow(Agent):
         super().__init__()
 
         self.env = env
+        self.opponent = opponent
         self.device = device
         self.training = training
+
+        if opponent is not None:
+            self.hockey = True
+            bins = 7
+        else:
+            self.hockey = False
 
         self.n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else bins
         n_observations = env.observation_space.shape[0]
@@ -101,21 +110,25 @@ class Rainbow(Agent):
         while not done:
             action = self.select_action(state)
 
-            next_state, reward, done = self.step(state, action)
+            opp_action = self.opponent.act(state.squeeze().cpu().numpy()) if self.hockey else None
+            next_state, reward, done = self.step(state, action, opp_action)
 
             self.optimize(**self.training)
 
             state = next_state
 
-    def step(self, state, action):
-        next_state, reward, terminated, truncated, _ = self.env.step(action.item())
-        reward = torch.tensor([reward], device=self.device)
+    def step(self, state, action, action_opp=None):
+        if self.hockey:
+            act = self.env.discrete_to_continous_action(action.item())
+            act = np.hstack([act, action_opp])
+        else:
+            act = action.item()
+
+        next_state, reward, terminated, truncated, _ = self.env.step(act)
+        reward = torch.tensor([reward], device=self.device, dtype=torch.float64)
         done = terminated or truncated
 
-        if terminated:
-            next_state = None
-        else:
-            next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
         if self.use_n_step:
             one_step_transition = self.memory_n.push(*Transition(state, action, next_state, reward, done))
@@ -139,6 +152,8 @@ class Rainbow(Agent):
             dtype=torch.bool,
         )
         non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
+
+        assert len(non_final_next_states) == batch_size, "Non final next states should have the same size as the batch"
 
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)

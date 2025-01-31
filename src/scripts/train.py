@@ -1,6 +1,7 @@
 import os
 import sys
 import gymnasium as gym
+import hockey
 import hydra
 import numpy as np
 import torch
@@ -16,9 +17,13 @@ from agents import Agent
 from utils.helper import DiscreteActionWrapper, load_checkpoint, save_checkpoint
 
 
-def initialize_environment(cfg: DictConfig) -> gym.Env:
-    env = gym.make(cfg.env)
-    env = gym.wrappers.RecordEpisodeStatistics(env)
+def initialize_environment(cfg: DictConfig):
+    opp = None
+    if cfg.env.name == "Hockey-v0":
+        env = hockey.hockey_env.HockeyEnv()
+        opp = hydra.utils.instantiate(cfg.env.opponent)
+    else:
+        env = gym.make(cfg.env.name)
 
     # Check if env continuous and agent not continuous -> wrap env
     agent_continuous = cfg.agent.requires_continues_action_space
@@ -28,10 +33,10 @@ def initialize_environment(cfg: DictConfig) -> gym.Env:
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
-    return env
+    return env, opp
 
 
-def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
+def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.device, checkpoint_path: str) -> Agent:
     agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
@@ -40,6 +45,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     agent: Agent = hydra.utils.instantiate(
         config=cfg.agent,
         env=env,
+        opponent=opponent,
         device=device,
         recursive=False,
     )
@@ -79,8 +85,8 @@ def run_training(cfg: DictConfig):
         f"{cfg.agent.name}_last.ckpt",
     )
 
-    env = initialize_environment(cfg)
-    agent, start_episode = initialize_agent(cfg, env, device, checkpoint_path)
+    env, opponent = initialize_environment(cfg)
+    agent, start_episode = initialize_agent(cfg, env, opponent, device, checkpoint_path)
 
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):

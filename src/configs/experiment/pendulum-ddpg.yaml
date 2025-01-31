@@ -3,7 +3,8 @@
 defaults:
   - override /agent: ddpg
 
-env: Pendulum-v1
+env: 
+  name: Pendulum-v1
 
 agent:
   name: pendulum-ddpg-pink-noise
