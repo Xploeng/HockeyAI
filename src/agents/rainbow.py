@@ -4,6 +4,7 @@ import hydra
 import torch
 
 from gymnasium import spaces
+from PIL import Image
 
 from .agent import Agent
 
@@ -219,6 +220,31 @@ class Rainbow(Agent):
         self.policy_net.reset_noise()
         self.target_net.reset_noise()
 
+    def evaluate_episode(self) -> tuple[list[Image.Image], dict]:
+        state, info = self.env.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        done = False
+        frames = []
+
+        while not done:
+            # Render the environment and save the frames
+            frame = self.env.render()
+            if frame is not None:
+                frames.append(Image.fromarray(frame))
+
+            # Action selection and recording the transition
+            action = self.select_action(state)
+            next_state, reward, terminated, truncated, info = self.env.step(action.item())
+            done = terminated or truncated
+
+            self.record(state, action, next_state, reward, done)
+
+            if not done:
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                state = next_state
+
+        return frames, info
+
     def load_state_dict(
         self,
         agent_state_dict,
@@ -230,7 +256,7 @@ class Rainbow(Agent):
         self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
 
         self.memory = agent_state_dict["memory"]
-        self.steps_done = len(self.memory)
+        self.steps_done = episode
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(
