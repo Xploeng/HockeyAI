@@ -5,25 +5,36 @@ import warnings
 
 from dataclasses import asdict
 import gymnasium as gym
+import hockey
 import hydra
 import numpy as np
 import torch
 
 from gymnasium import spaces
-from gymnasium.wrappers import RecordEpisodeStatistics
 from omegaconf import DictConfig
-from PIL import Image
+from tqdm import tqdm
 
 
 sys.path.append("src/")
 from agents import Agent
 from utils import DiscreteActionWrapper
-from utils.visuals import EpisodeStatistics, plot_q_function_all_dims, plot_rewards, save_gif, save_json
+from utils.visuals import (
+    EpisodeStatistics,
+    plot_q_function_all_dims,
+    plot_rewards,
+    plot_wins_vs_losses,
+    save_gif,
+    save_json,
+)
 
 
-def initialize_environment(cfg: DictConfig) -> gym.Env:
-    env = gym.make(cfg.env, render_mode="rgb_array")
-    env = gym.wrappers.RecordEpisodeStatistics(env)
+def initialize_environment(cfg: DictConfig):
+    opp = None
+    if cfg.env.name == "Hockey-v0":
+        env = hockey.hockey_env.HockeyEnv()
+        opp = hydra.utils.instantiate(cfg.env.opponent)
+    else:
+        env = gym.make(cfg.env.name, render_mode="rgb_array")
 
     # Check if env continuous and agent not continuous -> wrap env
     agent_continuous = cfg.agent.requires_continues_action_space
@@ -33,10 +44,10 @@ def initialize_environment(cfg: DictConfig) -> gym.Env:
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
-    return env
+    return env, opp
 
 
-def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str) -> Agent:
+def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.device, checkpoint_path: str) -> Agent:
     agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
@@ -45,6 +56,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     agent: Agent = hydra.utils.instantiate(
         config=cfg.agent,
         env=env,
+        opponent=opponent,
         device=device,
         recursive=False,
     )
@@ -75,8 +87,8 @@ def evaluate_model(cfg: DictConfig) -> None:
     )
 
     # Initialize the environment and agent
-    env = initialize_environment(cfg)
-    agent = initialize_agent(cfg, env, device, checkpoint_path)
+    env, opp = initialize_environment(cfg)
+    agent = initialize_agent(cfg, env, opp, device, checkpoint_path)
 
     # Fresh recordings (clear training recordings)
     agent.memory.clear()
@@ -84,12 +96,15 @@ def evaluate_model(cfg: DictConfig) -> None:
     # Plot the Q-function for all state dimensions
     # plot_q_function_all_dims(agent, cfg.env, figures_dir)
 
+    wins = 0
+    draws = 0
+    losses = 0
+
     # Start the evaluation
     all_episode_stats = {}
     print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
-    for episode in range(cfg.testing.episodes):
-
-        frames, info = agent.evaluate_episode()
+    for episode in tqdm(range(cfg.testing.episodes)):
+        frames, info = agent.evaluate_episode(render=cfg.testing.render)
 
         # Keep track of episode statistics and save the animation
         rewards, states = agent.memory.rewards, agent.memory.states
@@ -97,14 +112,25 @@ def evaluate_model(cfg: DictConfig) -> None:
         all_episode_stats[episode] = asdict(episode_stats)
         agent.memory.clear()
 
-        gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
-        save_gif(frames, gif_path)
-        print(f"Episode {episode} animation saved as {gif_path}")
+        if cfg.testing.hockey:
+            if info["winner"] == 1:
+                wins += 1
+            elif info["winner"] == 0:
+                draws += 1
+            else:
+                losses += 1
+        if cfg.testing.render:
+            gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
+            save_gif(frames, gif_path)
+            print(f"Episode {episode} animation saved as {gif_path}")
 
     # Save the episode statistics as json
     stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{cfg.agent.name}.json")
     save_json(all_episode_stats, stats_file_path)
     print(f"Episode statistics saved to {stats_file_path}")
+
+    # Plot the results as a pie chart
+    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.testing.show_figures)
 
 
 def run_evaluations(configuration_dir_list: list[str], device: str, silent: bool = False) -> None:

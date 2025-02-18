@@ -224,3 +224,34 @@ def plot_q_function_all_dims(agent: Any, env_name: str, out_dir: str) -> None:
         plt.close(fig)
 
     print(f"Value function surface figures saved to {out_dir}")
+
+
+def plot_wins_vs_losses(wins, draws, losses, save_path, show=True):
+    labels = "Wins", "Draws", "Losses"
+    sizes = [wins, draws, losses]
+    colors = ["#ff9999", "#66b3ff", "#99ff99"]
+    explode = (0.1, 0, 0)  # explode the 1st slice (Wins)
+
+    fig1, ax1 = plt.subplots()
+    wedges, texts, autotexts = ax1.pie(
+        sizes,
+        explode=explode,
+        labels=labels,
+        colors=colors,
+        autopct="%1.1f%%",
+        shadow=True,
+        startangle=90,
+    )
+    ax1.axis("equal")  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    # Add percentage values
+    for autotext in autotexts:
+        autotext.set_color("white")
+        autotext.set_fontsize(12)
+
+    pie_chart_path = os.path.join(save_path, "winrate.png")
+    fig1.savefig(pie_chart_path)
+    print(f"Evaluation pie chart saved to {pie_chart_path}")
+    if show:
+        plt.show()
+    plt.close()

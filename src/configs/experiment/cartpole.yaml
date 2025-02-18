@@ -1,7 +1,8 @@
 # @package _global_
 
 device: cuda:0
-env: CartPole-v1
+env: 
+  name: CartPole-v1
 
 agent:
   name: cartpole-dql

@@ -3,12 +3,11 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-
-env: 
-  name: Pendulum-v1
+  - override /env: hockey
 
 agent:
-  name: rainbow
+  name: rainbow_hockey
+  requires_continues_action_space: True
 
   network:
     hidden_size: 256
@@ -16,7 +15,14 @@ agent:
   training:
     criterion: 
       reduction: 'none'
-    episodes: 300
+    episodes: 500
     batch_size: 128
     save_agent: True
     continue_training: False
+
+testing:
+  episodes: 10
+  episode_max_steps: 200
+  show_figures: True
+  hockey : True
+  render: False
