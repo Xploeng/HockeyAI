@@ -8,6 +8,7 @@ import torch
 
 from gymnasium import spaces
 
+from agents.agent import Agent
 
 def load_checkpoint(cfg, agent, checkpoint_path, device):
     """
@@ -23,12 +24,14 @@ def load_checkpoint(cfg, agent, checkpoint_path, device):
         int: The episode number from which to continue training, or 0 if no checkpoint is loaded.
     """
     if cfg.agent.training.continue_training and os.path.exists(checkpoint_path):
+        print(f"Loading checkpoint from {checkpoint_path}")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", FutureWarning)
             checkpoint = torch.load(checkpoint_path, map_location=device)
         agent.load_state_dict(**checkpoint)
         return checkpoint.get("episode", 0)
-    return 0
+    else:
+        return 0
 
 
 def save_checkpoint(agent, checkpoint_path, episode):
@@ -99,3 +102,20 @@ class DiscreteActionWrapper(gym.ActionWrapper):
         return self.orig_action_space.low + action / (self.bins - 1.0) * (
             self.orig_action_space.high - self.orig_action_space.low
         )
+        
+class OpponentWrapper:
+    def __init__(self, opponent, env):
+        self.env = env
+        self.opponent = opponent
+        
+        self.opp_type = 'agent' if isinstance(opponent, Agent) else 'basic'
+        
+    def act(self, state: torch.Tensor):
+        action = None
+        if self.opp_type == 'basic':
+            action = self.opponent.act(state.squeeze().cpu().numpy())
+        elif self.opp_type == 'agent':
+            action = self.opponent.select_action(state)
+            action = self.env.discrete_to_continous_action(action.item())
+            
+        return action

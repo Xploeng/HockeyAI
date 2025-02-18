@@ -25,6 +25,7 @@ class Rainbow(Agent):
         n_memory=None,
         device=torch.device("cuda:0"),
         bins=100,
+        mode='train',
         **_,
     ):
         super().__init__()
@@ -33,8 +34,9 @@ class Rainbow(Agent):
         self.opponent = opponent
         self.device = device
         self.training = training
+        self.mode = mode
 
-        if opponent is not None:
+        if opponent is not None or self.mode == 'opponent':
             self.hockey = True
             bins = 7
         else:
@@ -110,7 +112,7 @@ class Rainbow(Agent):
         while not done:
             action = self.select_action(state)
 
-            opp_action = self.opponent.act(state.squeeze().cpu().numpy()) if self.hockey else None
+            opp_action = self.opponent.act(state) if self.hockey else None
             next_state, reward, done = self.step(state, action, opp_action)
 
             self.optimize(**self.training)
@@ -142,7 +144,6 @@ class Rainbow(Agent):
 
     def _compute_loss(self, samples, batch_size, gamma):
         transitions = samples["transitions"]
-
         # Transpose the batch
         batch = Transition(*zip(*transitions))
         # Compute a mask of non-final states and concatenate the batch elements
@@ -276,14 +277,17 @@ class Rainbow(Agent):
     ):
         self.target_net.load_state_dict(agent_state_dict["network_state_dict"])
         self.policy_net.load_state_dict(agent_state_dict["network_state_dict"])
-        self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
+        if self.mode == 'train':
+            self.optimizer.load_state_dict(agent_state_dict["optimizer_state_dict"])
 
-        self.memory = agent_state_dict["memory"]
-        self.steps_done = episode
+            self.memory = agent_state_dict["memory"]
+            self.memory_n = agent_state_dict["memory_n"]
+            self.steps_done = episode
 
     def state_dict(self) -> collections.OrderedDict:
         return collections.OrderedDict(
             {"network_state_dict": self.policy_net.state_dict(),
              "optimizer_state_dict": self.optimizer.state_dict(),
-             "memory": self.memory},
+             "memory": self.memory,
+             "memory_n": self.memory_n,},
         )

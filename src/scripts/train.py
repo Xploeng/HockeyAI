@@ -1,6 +1,7 @@
 import os
 import sys
 import gymnasium as gym
+import yaml
 import hockey
 import hydra
 import numpy as np
@@ -14,14 +15,34 @@ from tqdm import tqdm
 
 sys.path.append("src/")
 from agents import Agent
-from utils.helper import DiscreteActionWrapper, load_checkpoint, save_checkpoint
+from utils.helper import DiscreteActionWrapper, OpponentWrapper, load_checkpoint, save_checkpoint
 
+def get_checkpoint_path(agent_name):
+    return os.path.join(
+        "src/outputs",
+        agent_name,
+        "checkpoints",
+        f"{agent_name}_last.ckpt",
+    )
+
+def initialize_opponent(cfg: DictConfig, env, device: torch.device):
+    if cfg.env.opponent_type == "AgentOpponent":
+        opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
+        with open(opp_cfg_pth, 'r') as file:
+            opp_cfg = DictConfig(yaml.safe_load(file))
+        
+        # enable checkpoint loading
+        opp_cfg.agent.training.continue_training = True
+        opp_cfg.agent.mode = 'opponent'
+        
+        opp, _ = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
+        return OpponentWrapper(opp, env)
+    elif cfg.env.opponent_type == "BasicOpponent":
+        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env)
 
 def initialize_environment(cfg: DictConfig):
-    opp = None
     if cfg.env.name == "Hockey-v0":
         env = hockey.hockey_env.HockeyEnv()
-        opp = hydra.utils.instantiate(cfg.env.opponent)
     else:
         env = gym.make(cfg.env.name)
 
@@ -33,10 +54,10 @@ def initialize_environment(cfg: DictConfig):
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
-    return env, opp
+    return env
 
 
-def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.device, checkpoint_path: str) -> Agent:
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str, opponent= None) -> tuple[Agent, int]:
     agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
@@ -78,15 +99,9 @@ def run_training(cfg: DictConfig):
     device = torch.device(cfg.device)
     print(f"Using device: {device}")
 
-    checkpoint_path = os.path.join(
-        "src/outputs",
-        cfg.agent.name,
-        "checkpoints",
-        f"{cfg.agent.name}_last.ckpt",
-    )
-
-    env, opponent = initialize_environment(cfg)
-    agent, start_episode = initialize_agent(cfg, env, opponent, device, checkpoint_path)
+    env = initialize_environment(cfg)
+    opponent = initialize_opponent(cfg, env, device) if cfg.env.name == "Hockey-v0" else None
+    agent, start_episode = initialize_agent(cfg, env, device, get_checkpoint_path(cfg.agent.name), opponent=opponent)
 
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
@@ -99,7 +114,7 @@ def run_training(cfg: DictConfig):
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
 
         if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:
-            save_checkpoint(agent, checkpoint_path, episode)
+            save_checkpoint(agent, get_checkpoint_path(cfg.agent.name), episode)
 
     writer.flush()
     writer.close()

@@ -3,10 +3,10 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-  - override /env: hockey
+  - override /env: hockey-vs-agent
 
 agent:
-  name: rainbow_hockey_bot_play
+  name: rainbow_hockey_self_play
   requires_continues_action_space: True
 
   network:

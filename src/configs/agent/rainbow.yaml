@@ -6,6 +6,8 @@ defaults:
 
 bins: 100
 
+mode: train # train/test or opponent
+
 # type: DQL Agent
 _target_: agents.Rainbow
 _recursive_: False
