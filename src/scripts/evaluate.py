@@ -63,7 +63,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.devi
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     agent.load_state_dict(**checkpoint)
 
     return agent
