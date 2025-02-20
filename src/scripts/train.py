@@ -16,6 +16,7 @@ from tqdm import tqdm
 sys.path.append("src/")
 from agents import Agent
 from utils.helper import DiscreteActionWrapper, OpponentWrapper, load_checkpoint, save_checkpoint
+from gymnasium.envs.registration import register
 
 def get_checkpoint_path(agent_name):
     return os.path.join(

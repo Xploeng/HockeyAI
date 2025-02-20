@@ -23,8 +23,21 @@ class EpisodeStatistics:
 
 
 def save_json(data: Any, file_path: str) -> None:
+    """Save data to a JSON file with NumPy array handling"""
+    def convert_numpy(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: convert_numpy(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy(item) for item in obj]
+        return obj
+
+    # Convert NumPy arrays to lists before serialization
+    converted_data = convert_numpy(data)
+    
     with open(file_path, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(converted_data, f, indent=4)
 
 
 def save_gif(frames: list[Image.Image], file_path: str, duration: int = 50) -> None:

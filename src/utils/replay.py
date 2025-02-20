@@ -58,6 +58,57 @@ class ReplayMemory:
             for transition in self.memory[: self.ptr]
         ]
 
+    def sample_sequences(self, batch_size: int, seq_len: int) -> dict:
+        """Sample sequences from the replay buffer."""
+        if self.size < seq_len:
+            raise ValueError(f"Not enough transitions ({self.size}) to sample a full sequence of length {seq_len}.")
+
+        obs_seq = []
+        action_seq = []
+        reward_seq = []
+        done_seq = []
+        next_state_seq = []
+
+        # Each sequence is built by chaining consecutive transitions
+        for _ in range(batch_size):
+            # sample a valid start index so that i + seq_len doesn't exceed the buffer
+            start_idx = random.randint(0, self.size - seq_len)
+
+            # Extract consecutive transitions
+            transitions = self.memory[start_idx : start_idx + seq_len]
+
+            # Convert observations to numpy arrays when building sequences
+            sequence_obs = []
+            for t in transitions:
+                if isinstance(t.state, torch.Tensor):
+                    obs = t.state.cpu().numpy()
+                elif isinstance(t.state, np.ndarray):
+                    obs = t.state
+                else:
+                    obs = np.array(t.state, dtype=np.float32)
+                sequence_obs.append(obs)
+            
+            obs_seq.append(sequence_obs)
+            action_seq.append([t.action for t in transitions])
+            reward_seq.append([t.reward for t in transitions])
+            done_seq.append([t.done for t in transitions])
+            next_state_seq.append([t.next_state for t in transitions])
+
+        # Convert to numpy arrays with explicit dtype
+        obs_seq = np.array(obs_seq, dtype=np.float32)  # Changed from dtype=object
+        action_seq = np.array(action_seq, dtype=np.float32)
+        reward_seq = np.array(reward_seq, dtype=np.float32)
+        done_seq = np.array(done_seq, dtype=bool)
+        next_state_seq = np.array(next_state_seq, dtype=np.float32)
+
+        return {
+            'obs_seq': obs_seq,
+            'action_seq': action_seq,
+            'reward_seq': reward_seq,
+            'done_seq': done_seq,
+            'next_state_seq': next_state_seq,
+        }
+
 
 class PrioritizedReplayMemory(ReplayMemory):
     """

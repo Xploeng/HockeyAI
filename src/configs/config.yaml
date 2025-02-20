@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - testing: default
-  - agent: default
+  - agent: dreamer
   - env: default
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
@@ -9,7 +9,7 @@ defaults:
 device: cuda:0
 seed: 1234
 verbose : True
-env: CartPole-v1
+env: Pendulum-v1
 
 hydra:
   run:

@@ -1,0 +1,32 @@
+defaults:
+  - memory: replay_buffer
+  - training: default
+
+_target_: agents.Dreamer
+_recursive_: False
+name: dreamer
+
+requires_continues_action_space: True
+
+# world model hyperparameters
+model_config:
+  hidden_dim: 200       # RSSM hidden state size
+  state_dim: 30         # Dimension of latent state
+  embed_dim: 200        # Dimension of encoded observations
+  kl_weight: 1.0        # Balances reconstruction vs KL loss
+  learning_rate: 3e-4   # World Model learning rate
+  grad_clip: 1.0
+  reward_scale: 1.0
+
+# Actor configuration
+actor_config:
+  hidden_dim: 400       # Size of actor's hidden layers
+  min_stddev: 0.1
+  learning_rate: 3e-4   # Actor learning rate
+  grad_clip: 1.0
+
+# Critic configuration
+critic_config:
+  hidden_dim: 400       # Critic hidden size
+  learning_rate: 3e-4   # Critic learning rate 
+  grad_clip: 1.0

@@ -26,6 +26,13 @@ from utils.visuals import (
     save_gif,
     save_json,
 )
+from gymnasium.envs.registration import register
+
+if 'Hockey-v0' not in gym.envs.registry.keys():
+    register(
+        id='Hockey-v0',
+        entry_point='hockey.hockey_env:HockeyEnv',  
+    )
 
 
 def initialize_environment(cfg: DictConfig):
@@ -130,7 +137,7 @@ def evaluate_model(cfg: DictConfig) -> None:
     print(f"Episode statistics saved to {stats_file_path}")
 
     # Plot the results as a pie chart
-    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.testing.show_figures)
+    #plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.testing.show_figures)
 
 
 def run_evaluations(configuration_dir_list: list[str], device: str, silent: bool = False) -> None:

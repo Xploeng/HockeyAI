@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
 
 from torchrl.modules import NoisyLinear
-
+from torch.distributions import Normal
 
 class DQN(nn.Module):
     def __init__(self, n_actions, n_observations, hidden_size, **_):
@@ -66,11 +66,13 @@ class Critic(nn.Module):
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, output_size)
 
-    def forward(self, state, action):
+    def forward(self, state, action=None):
         """
-        Params state and actions are torch tensors
+        Params:
+            state: torch tensor of state/features
+            action: Optional action tensor (as Dreamer Critic only evaluates imagined states )
         """
-        x = torch.cat([state, action], 1)
+        x = state if action is None else torch.cat([state, action], 1)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
@@ -79,21 +81,34 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, min_stddev=0.1, learning_rate=3e-4, deterministic=True):
+        """
+            deterministic: If True, return direct actions (default)
+                         If False, return distribution (used by e.g Dreamer)
+        """
         super().__init__()
+        self.min_stddev = min_stddev
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
-        self.linear3 = nn.Linear(hidden_size, output_size)
-
+        self.linear3 = nn.Linear(hidden_size, 2 * output_size)  # 2x for mean and stddev
+        self.deterministic = deterministic
     def forward(self, state):
         """
         Param state is a torch tensor
         """
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
-        x = torch.tanh(self.linear3(x))
-
-        return x
+        x = self.linear3(x)
+        
+        # Split into mean and stddev
+        mean, stddev = torch.chunk(x, 2, dim=-1)
+        mean = torch.tanh(mean)  
+        
+        if self.deterministic:
+            return mean
+        
+        stddev = F.softplus(stddev) + self.min_stddev
+        return Normal(mean, stddev)
 
     def max_q(self, observations):
         observations = torch.from_numpy(observations.astype(np.float32))
