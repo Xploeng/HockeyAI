@@ -7,8 +7,8 @@ import gymnasium as gym
 import torch
 
 from gymnasium import spaces
-
 from agents.agent import Agent
+
 
 def load_checkpoint(cfg, agent, checkpoint_path, device):
     """
@@ -102,14 +102,14 @@ class DiscreteActionWrapper(gym.ActionWrapper):
         return self.orig_action_space.low + action / (self.bins - 1.0) * (
             self.orig_action_space.high - self.orig_action_space.low
         )
-        
+
 class OpponentWrapper:
     def __init__(self, opponent, env):
         self.env = env
         self.opponent = opponent
-        
+
         self.opp_type = 'agent' if isinstance(opponent, Agent) else 'basic'
-        
+
     def act(self, state: torch.Tensor):
         action = None
         if self.opp_type == 'basic':
@@ -117,5 +117,5 @@ class OpponentWrapper:
         elif self.opp_type == 'agent':
             action = self.opponent.select_action(state)
             action = self.env.discrete_to_continous_action(action.item())
-            
+
         return action
