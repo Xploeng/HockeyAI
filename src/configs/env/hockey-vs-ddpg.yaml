@@ -1,0 +1,4 @@
+name: Hockey-v0
+opponent_type: AgentOpponent
+opponent: 
+  name: ddpg_hockey_self_play

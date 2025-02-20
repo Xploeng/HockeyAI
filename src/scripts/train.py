@@ -1,12 +1,12 @@
 import os
 import sys
 import gymnasium as gym
-import yaml
 import hockey
 import hydra
 import numpy as np
 import torch
 import torch.utils.tensorboard as tb
+import yaml
 
 from gymnasium import spaces
 from omegaconf import DictConfig
@@ -16,6 +16,7 @@ from tqdm import tqdm
 sys.path.append("src/")
 from agents import Agent
 from utils.helper import DiscreteActionWrapper, OpponentWrapper, load_checkpoint, save_checkpoint
+
 
 def get_checkpoint_path(agent_name):
     return os.path.join(
@@ -28,17 +29,19 @@ def get_checkpoint_path(agent_name):
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
         opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
-        with open(opp_cfg_pth, 'r') as file:
+        with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
-        
+
         # enable checkpoint loading
         opp_cfg.agent.training.continue_training = True
         opp_cfg.agent.mode = 'opponent'
-        
+
         opp, _ = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
         return OpponentWrapper(opp, env)
     elif cfg.env.opponent_type == "BasicOpponent":
         return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env)
+    else:
+        raise ValueError(f"Unknown opponent type: {cfg.env.opponent_type}")
 
 def initialize_environment(cfg: DictConfig):
     if cfg.env.name == "Hockey-v0":
