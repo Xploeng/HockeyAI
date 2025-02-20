@@ -251,7 +251,7 @@ class Rainbow(Agent):
 
             # Action selection and recording the transition
             action = self.select_action(state)
-            opp_action = self.opponent.act(state.squeeze().cpu().numpy()) if self.hockey else None
+            opp_action = self.opponent.act(state) if self.hockey else None
             if self.hockey:
                 act = self.env.discrete_to_continous_action(action.item())
                 act = np.hstack([act, opp_action])

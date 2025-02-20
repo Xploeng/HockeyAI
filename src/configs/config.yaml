@@ -1,6 +1,5 @@
 defaults:
   - _self_
-  - testing: default
   - agent: default
   - env: default
   - override hydra/hydra_logging: disabled

@@ -19,10 +19,3 @@ agent:
     batch_size: 128
     save_agent: True
     continue_training: False
-
-testing:
-  episodes: 10
-  episode_max_steps: 200
-  show_figures: True
-  hockey : True
-  render: False

@@ -3,7 +3,7 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-  - override /env: hockey-vs-agent
+  - override /env: hockey
 
 agent:
   name: rainbow_hockey_self_play
@@ -15,14 +15,7 @@ agent:
   training:
     criterion: 
       reduction: 'none'
-    episodes: 500
+    episodes: 200
     batch_size: 128
     save_agent: True
-    continue_training: False
-
-testing:
-  episodes: 10
-  episode_max_steps: 200
-  show_figures: True
-  hockey : True
-  render: False
+    continue_training: True

@@ -1,10 +1,9 @@
-import argparse
 import os
 import sys
-import warnings
 
 from dataclasses import asdict
 import gymnasium as gym
+import yaml
 import hockey
 import hydra
 import numpy as np
@@ -13,11 +12,11 @@ import torch
 from gymnasium import spaces
 from omegaconf import DictConfig
 from tqdm import tqdm
-
+from hydra.core.global_hydra import GlobalHydra
 
 sys.path.append("src/")
 from agents import Agent
-from utils import DiscreteActionWrapper
+from utils import DiscreteActionWrapper, OpponentWrapper, load_checkpoint
 from utils.visuals import (
     EpisodeStatistics,
     plot_q_function_all_dims,
@@ -27,12 +26,32 @@ from utils.visuals import (
     save_json,
 )
 
+def get_checkpoint_path(agent_name):
+    return os.path.join(
+        "src/outputs",
+        agent_name,
+        "checkpoints",
+        f"{agent_name}_last.ckpt",
+    )
+
+def initialize_opponent(cfg: DictConfig, env, device: torch.device):
+    if cfg.env.opponent_type == "AgentOpponent":
+        opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
+        with open(opp_cfg_pth, 'r') as file:
+            opp_cfg = DictConfig(yaml.safe_load(file))
+        
+        # enable checkpoint loading
+        opp_cfg.agent.training.continue_training = True
+        opp_cfg.agent.mode = 'opponent'
+        
+        opp = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
+        return OpponentWrapper(opp, env)
+    elif cfg.env.opponent_type == "BasicOpponent":
+        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env)
 
 def initialize_environment(cfg: DictConfig):
-    opp = None
     if cfg.env.name == "Hockey-v0":
         env = hockey.hockey_env.HockeyEnv()
-        opp = hydra.utils.instantiate(cfg.env.opponent)
     else:
         env = gym.make(cfg.env.name, render_mode="rgb_array")
 
@@ -44,10 +63,10 @@ def initialize_environment(cfg: DictConfig):
         raise ValueError(
             f"Agent requires a continuous action space, but {cfg.env} has a discrete action space.",
         )
-    return env, opp
+    return env
 
 
-def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.device, checkpoint_path: str) -> Agent:
+def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkpoint_path: str, opponent= None) -> tuple[Agent, int]:
     agent_continuous = cfg.agent.requires_continues_action_space
     env_continuous = isinstance(env.action_space, spaces.Box)
     if agent_continuous and not env_continuous:
@@ -60,35 +79,31 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, opponent, device: torch.devi
         device=device,
         recursive=False,
     )
+    
+    cfg.agent.training.continue_training = True
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    agent.load_state_dict(**checkpoint)
+    _ = load_checkpoint(cfg, agent, checkpoint_path, device)
 
     return agent
 
 
-def evaluate_model(cfg: DictConfig) -> None:
+def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     device = torch.device(cfg.device)
 
-    animation_dir = os.path.join("src/outputs", cfg.agent.name, "animations")
+    animation_dir = os.path.join("src/outputs", cfg.agent, "animations")
     os.makedirs(animation_dir, exist_ok=True)
-    episode_stats_dir = os.path.join("src/outputs", cfg.agent.name, "episode_statistics")
+    episode_stats_dir = os.path.join("src/outputs", cfg.agent, "episode_statistics")
     os.makedirs(episode_stats_dir, exist_ok=True)
-    figures_dir = os.path.join("src/outputs", cfg.agent.name, "figures")
+    figures_dir = os.path.join("src/outputs", cfg.agent, "figures")
     os.makedirs(figures_dir, exist_ok=True)
 
-    checkpoint_path = os.path.join(
-        "src/outputs",
-        cfg.agent.name,
-        "checkpoints",
-        f"{cfg.agent.name}_last.ckpt",
-    )
+    checkpoint_path = get_checkpoint_path(agent_cfg.agent.name)
 
     # Initialize the environment and agent
-    env, opp = initialize_environment(cfg)
-    agent = initialize_agent(cfg, env, opp, device, checkpoint_path)
+    agent_cfg.env = cfg.env
+    env= initialize_environment(agent_cfg)
+    opp = initialize_opponent(agent_cfg, env, device)
+    agent = initialize_agent(agent_cfg, env, device, checkpoint_path, opp)
 
     # Fresh recordings (clear training recordings)
     agent.memory.clear()
@@ -102,9 +117,13 @@ def evaluate_model(cfg: DictConfig) -> None:
 
     # Start the evaluation
     all_episode_stats = {}
-    print(f"\nEvaluating the model on {cfg.testing.episodes} episodes.")
-    for episode in tqdm(range(cfg.testing.episodes)):
-        frames, info = agent.evaluate_episode(render=cfg.testing.render)
+    print(f"\nEvaluating the model on {cfg.episodes} episodes.")
+    if cfg.hockey:
+        op_name = agent_cfg.env.opponent.name if cfg.env.opponent_type == "AgentOpponent" else "BasicOpponent"
+        print("Hockey mode enabled.")
+        print(f"Evaluating {cfg.agent} against {op_name}.")
+    for episode in tqdm(range(cfg.episodes)):
+        frames, info = agent.evaluate_episode(render=cfg.render)
 
         # Keep track of episode statistics and save the animation
         rewards, states = agent.memory.rewards, agent.memory.states
@@ -112,77 +131,51 @@ def evaluate_model(cfg: DictConfig) -> None:
         all_episode_stats[episode] = asdict(episode_stats)
         agent.memory.clear()
 
-        if cfg.testing.hockey:
+        if cfg.hockey:
             if info["winner"] == 1:
                 wins += 1
             elif info["winner"] == 0:
                 draws += 1
             else:
                 losses += 1
-        if cfg.testing.render:
+        if cfg.render:
             gif_path = os.path.join(animation_dir, f"episode_{episode}.gif")
             save_gif(frames, gif_path)
-            print(f"Episode {episode} animation saved as {gif_path}")
 
     # Save the episode statistics as json
-    stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{cfg.agent.name}.json")
+    stats_file_path = os.path.join(episode_stats_dir, f"episode_statistics_{agent_cfg.agent.name}.json")
     save_json(all_episode_stats, stats_file_path)
     print(f"Episode statistics saved to {stats_file_path}")
 
     # Plot the results as a pie chart
-    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.testing.show_figures)
+    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.show_figures)
 
+@hydra.main(config_path="../configs/", config_name="config_eval", version_base=None)
+def run_evaluations(cfg: DictConfig) -> None:
+    device = cfg.device
+    silent = cfg.silent
+    episodes = cfg.episodes
+    show_figures = cfg.show_figures
+    
+    GlobalHydra.instance().clear()
+    config_path = os.path.join("../outputs", cfg.agent, ".hydra")
+    with hydra.initialize(version_base=None, config_path=config_path):
+        agent_cfg = hydra.compose(config_name="config")
+        agent_cfg.device = device
+        agent_cfg.verbose = not silent
 
-def run_evaluations(configuration_dir_list: list[str], device: str, silent: bool = False) -> None:
-    for configuration_dir in configuration_dir_list:
-        config_path = os.path.join("..", configuration_dir, ".hydra")
+    if agent_cfg.seed:
+        np.random.seed(agent_cfg.seed)
+        torch.manual_seed(agent_cfg.seed)
 
-        with hydra.initialize(version_base=None, config_path=config_path):
-            cfg = hydra.compose(config_name="config")
-            cfg.device = device
-            cfg.verbose = not silent
+    evaluate_model(cfg=cfg, agent_cfg=agent_cfg)
 
-        if cfg.seed:
-            np.random.seed(cfg.seed)
-            torch.manual_seed(cfg.seed)
-
-        evaluate_model(cfg=cfg)
-
-        agent_output_dir = os.path.join("src/outputs", cfg.agent.name)
-        plot_rewards(
-            agent_output_dir,
-            n_episodes=cfg.testing.episodes,
-            show=cfg.testing.show_figures,
-        )
-
+    agent_output_dir = os.path.join("src/outputs", agent_cfg.agent.name)
+    plot_rewards(
+        agent_output_dir,
+        n_episodes=episodes,
+        show=show_figures,
+    )
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate a model with a given configuration.")
-    parser.add_argument(
-        "-c",
-        "--configuration-dir-list",
-        nargs="*",
-        default=["configs"],
-        help="List of directories where the configuration files of all models to be evaluated lie.",
-    )
-    parser.add_argument(
-        "-d",
-        "--device",
-        type=str,
-        default="cpu",
-        help="The device to run the evaluation. Any of ['cpu' (default), 'cuda', 'mpg'].",
-    )
-    parser.add_argument(
-        "-s",
-        "--silent",
-        default=False,
-        help="Silent mode to prevent printing results to console and visualizing plots dynamically.",
-    )
-
-    args = parser.parse_args()
-    run_evaluations(
-        configuration_dir_list=args.configuration_dir_list,
-        device=args.device,
-        silent=args.silent,
-    )
-    print("Done.")
+    run_evaluations()
