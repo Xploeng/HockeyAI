@@ -102,7 +102,7 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     # Initialize the environment and agent
     agent_cfg.env = cfg.env
     env= initialize_environment(agent_cfg)
-    opp = initialize_opponent(agent_cfg, env, device)
+    opp = initialize_opponent(cfg, env, device) if cfg.env.name == "Hockey-v0" else None
     agent = initialize_agent(agent_cfg, env, device, checkpoint_path, opp)
 
     # Fresh recordings (clear training recordings)
