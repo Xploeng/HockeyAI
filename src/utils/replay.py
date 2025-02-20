@@ -140,6 +140,11 @@ class PrioritizedReplayMemory(ReplayMemory):
 
 
 class NStepBuffer:
+    """
+    N-Step Replay Memory.
+    Adapted from:
+    https://github.com/Curt-Park/rainbow-is-all-you-need/blob/master/07.n_step_learning.ipynb
+    """
     def __init__(self, capacity: int, n_steps: int, gamma: float):
         self.capacity = capacity
         self.n_steps = n_steps

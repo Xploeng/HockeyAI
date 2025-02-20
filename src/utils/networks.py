@@ -172,6 +172,11 @@ class NoisyDueling(torch.nn.Module):
 
 
 class NoisyCategoricalDueling(torch.nn.Module):
+    """
+    Noisy Duealing and Categorical DQN
+    Adapted from:
+    https://github.com/Curt-Park/rainbow-is-all-you-need/blob/master/08.rainbow.ipynb
+    """
     def __init__(self, n_actions, n_observations, hidden_size, atom_size, support, **_):
         super().__init__()
 
