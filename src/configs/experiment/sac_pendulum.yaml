@@ -1,0 +1,20 @@
+# @package _global_
+
+defaults:
+  - override /agent: ddpg
+  - override /env: pendulum
+
+agent:
+  name: pendulum-sac
+  # hidden_size: 256
+  # actor_learning_rate: 1e-4
+  # critic_learning_rate: 1e-3
+  # gamma: 0.99
+  # tau: 1e-2
+
+  # training:
+  #   episodes: 50
+  #   batch_size: 256
+  #   save_agent: True
+  #   save_interval: 10
+  #   continue_training: True
