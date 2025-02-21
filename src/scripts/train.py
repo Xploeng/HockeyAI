@@ -108,7 +108,6 @@ def run_training(cfg: DictConfig):
 
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
-        episode += start_episode
 
         agent.train_episode()
 
