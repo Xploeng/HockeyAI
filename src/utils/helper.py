@@ -7,6 +7,7 @@ import gymnasium as gym
 import torch
 
 from gymnasium import spaces
+from icecream import ic
 from agents.agent import Agent
 
 
@@ -112,10 +113,20 @@ class OpponentWrapper:
 
     def act(self, state: torch.Tensor):
         action = None
+
         if self.opp_type == 'basic':
-            action = self.opponent.act(state.squeeze().cpu().numpy())
+            if isinstance(state, torch.Tensor): # rainbow state representation
+                action = self.opponent.act(state.squeeze().cpu().numpy())
+            else: # ddpg state representation
+                action = self.opponent.act(state)
+
         elif self.opp_type == 'agent':
-            action = self.opponent.select_action(state)
-            action = self.env.discrete_to_continous_action(action.item())
+            from agents.ddpg import DDPG
+            from agents.rainbow import Rainbow
+            if isinstance(self.opponent, Rainbow):
+                action = self.opponent.select_action(state)
+                action = self.env.discrete_to_continous_action(action.item())
+            elif isinstance(self.opponent, DDPG):
+                action = self.opponent.select_action(state)
 
         return action
