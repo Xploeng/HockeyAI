@@ -2,7 +2,7 @@ defaults:
   - criterion: smooth_l1
   - optimizer: adamW
 
-episodes: 200
+episodes: 500
 batch_size: 128
 tau: 0.005
 gamma: 0.99

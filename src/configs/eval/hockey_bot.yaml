@@ -1,9 +1,9 @@
 # @package _global_
 
 defaults:
-  - override /env: hockey-vs-agent
+  - override /env: hockey
 
-agent: 'rainbow_hockey_self_play'
+agent: 'rainbow_hockey_naf'
 
 episodes: 5
 episode_max_steps: 200

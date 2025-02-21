@@ -1,0 +1,19 @@
+# @package _global_
+
+# Override entire configuration yaml files
+defaults:
+  - override /agent: rainbow-naf
+  - override /env: hockey
+
+agent:
+  name: rainbow_hockey_naf
+  requires_continues_action_space: True
+
+  network:
+    hidden_size: 256
+
+  training:
+    episodes: 300
+    batch_size: 128
+    save_agent: True
+    continue_training: False

@@ -112,6 +112,7 @@ def run_training(cfg: DictConfig):
         loss = agent.losses[-1] if agent.losses else 0
         writer.add_scalar("Loss", loss, global_step=agent.steps_done)
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
+        writer.add_scalar("Reward", agent.reward, global_step=episode)
 
         if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:
             save_checkpoint(agent, get_checkpoint_path(cfg.agent.name), episode)

@@ -1,0 +1,13 @@
+defaults: 
+  - memory: prioritized_buffer
+  - memory@n_memory: n_step_buffer
+  - network: NAF
+  - training: default
+
+mode: train # train/test or opponent
+
+# type: DQL Agent
+_target_: agents.RainbowNAF
+_recursive_: False
+name: RainbowNAF
+requires_continues_action_space: True

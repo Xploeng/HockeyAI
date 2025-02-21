@@ -232,3 +232,78 @@ class NoisyCategoricalDueling(torch.nn.Module):
         observations = torch.from_numpy(observations.astype(np.float32))
         q_values = self.forward(observations)
         return torch.max(q_values, dim=1).values[0].detach().numpy()
+    
+    
+class NAF(torch.nn.Module):
+    def __init__(self, n_actions, n_observations, hidden_size, **_):
+        super().__init__()
+
+        self.in_dim = n_observations
+        self.out_dim = n_actions
+        # common feature layer
+        self.f1 = torch.nn.Sequential(
+            torch.nn.Linear(self.in_dim, hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm1d(hidden_size),
+        )
+        self.f2 = torch.nn.Sequential(
+            torch.nn.Linear(self.in_dim + hidden_size, hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm1d(hidden_size),
+        )
+        self.f3 = torch.nn.Sequential(
+            torch.nn.Linear(self.in_dim + hidden_size, hidden_size),
+            torch.nn.ReLU(),
+            torch.nn.BatchNorm1d(hidden_size),
+        )
+
+        # value layer
+        self.value_layer = nn.Linear(hidden_size, 1)
+
+        # mean action layer
+        self.mu = nn.Linear(hidden_size, self.out_dim)
+        
+        # Cholesky factor
+        self.matrix_entries = nn.Linear(hidden_size, int(self.out_dim * (self.out_dim + 1) / 2))
+
+    def forward(self, state: torch.Tensor, action = None) -> torch.Tensor:
+        assert state.dtype == torch.float32, f"Input must be a float tensor but got {state.dtype}"
+                
+        x = self.f1(state)
+        x = torch.cat([state, x], 1)
+        x = self.f2(x)
+        x = torch.cat([state, x], 1)
+        x = self.f3(x)
+        
+        
+        value = self.value_layer(x)
+        mu = torch.tanh(self.mu(x))
+        entries = torch.tanh(self.matrix_entries(x))
+        
+        # Lower triangular matrix
+        L = torch.zeros(state.size(0), self.out_dim, self.out_dim).to(state.device)
+        
+        # Fill the lower triangular matrix
+        tril_index = torch.tril_indices(row=self.out_dim, col=self.out_dim, offset=0)
+        L[:, tril_index[0], tril_index[1]] = entries
+        L.diagonal(dim1=1, dim2=2).exp_()
+    
+        P = L @ L.transpose(2, 1)
+        
+        Q = None
+        if action is not None:
+            advantage = -0.5 * (action - mu).unsqueeze(1) @ P @ (action - mu).unsqueeze(2)
+            Q = (value + advantage.squeeze(2)).float()
+            
+        # add noise to action mu:
+        dist = torch.distributions.MultivariateNormal(mu, torch.inverse(P))
+        action = dist.sample()
+        action = torch.clamp(action, min=-1, max=1)
+        
+        return action.float(), Q, value.float()
+
+
+    def reset_noise(self):
+        for module in self.children():
+            if hasattr(module, "reset_noise"):
+                module.reset_noise()
