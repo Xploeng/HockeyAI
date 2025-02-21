@@ -3,9 +3,9 @@
 defaults:
   - override /env: hockey
 
-agent: 'rainbow_hockey_naf'
+agent: 'rainbow_hockey_bot_play'
 
-episodes: 5
+episodes: 100
 episode_max_steps: 200
 show_figures: True
 hockey : True

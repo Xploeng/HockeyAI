@@ -6,7 +6,7 @@ defaults:
   - override /env: hockey
 
 agent:
-  name: rainbow_hockey_bot_play
+  name: rainbow_hockey_bot
   requires_continues_action_space: True
 
   network:
@@ -15,7 +15,7 @@ agent:
   training:
     criterion: 
       reduction: 'none'
-    episodes: 1000
+    episodes: 2000
     batch_size: 128
     save_agent: True
     continue_training: False

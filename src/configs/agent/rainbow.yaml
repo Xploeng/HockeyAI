@@ -13,3 +13,6 @@ _target_: agents.Rainbow
 _recursive_: False
 name: Rainbow
 requires_continues_action_space: False
+
+training:
+  composite_loss: False

@@ -35,6 +35,7 @@ class Rainbow(Agent):
         self.device = device
         self.training = training
         self.mode = mode
+        self.composite_loss = training.composite_loss
 
         if opponent is not None or self.mode == 'opponent':
             self.hockey = True
@@ -130,7 +131,7 @@ class Rainbow(Agent):
             act = action.item()
 
         next_state, reward, terminated, truncated, info = self.env.step(act)
-        if self.hockey:
+        if self.hockey and self.composite_loss:
             reward += info["reward_touch_puck"] + info["reward_puck_direction"]
         reward = torch.tensor([reward], device=self.device, dtype=torch.float64)
         done = terminated or truncated
