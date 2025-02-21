@@ -254,7 +254,6 @@ class NAF(torch.nn.Module):
         self.f3 = torch.nn.Sequential(
             torch.nn.Linear(self.in_dim + hidden_size, hidden_size),
             torch.nn.ReLU(),
-            torch.nn.BatchNorm1d(hidden_size),
         )
 
         # value layer
@@ -300,7 +299,7 @@ class NAF(torch.nn.Module):
         action = dist.sample()
         action = torch.clamp(action, min=-1, max=1)
         
-        return action.float(), Q, value.float()
+        return action.float(), Q, value.float(), mu.float()
 
 
     def reset_noise(self):

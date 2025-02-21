@@ -82,13 +82,13 @@ class RainbowNAF(Agent):
         self.episodes = training.episodes
         self.rewards = []
 
-    def select_action(self, state):
+    def select_action(self, state, noise=False):
         self.steps_done += 1
         self.policy_net.eval()
         with torch.no_grad():
-            action, _, _ = self.policy_net(state)
+            action_noise, _, _, action = self.policy_net(state)
         self.policy_net.train()
-        return action
+        return action_noise if noise else action
 
     def record(self, state, action, next_state, reward, done):
         return self.memory.push(state, action, next_state, reward, done)
@@ -112,7 +112,7 @@ class RainbowNAF(Agent):
         self.reward = 0
 
         while not done:
-            action = self.select_action(state)
+            action = self.select_action(state, noise=True)
 
             opp_action = self.opponent.act(state) if self.hockey else None
             next_state, reward, done = self.step(state, action, opp_action)
@@ -162,19 +162,19 @@ class RainbowNAF(Agent):
         
         # get the V value of the next state from target network
         with torch.no_grad():
-            _, _, V_next = self.target_net(non_final_next_states)
+            _, _, V_next, _ = self.target_net(non_final_next_states)
             
         # Compute Q targets
         expected_Q = reward_batch.unsqueeze(-1) + gamma * V_next
         
         # Compute expected Q values
-        _, Q_values, _ = self.policy_net(state_batch, action_batch)
+        _, Q_values, _, _ = self.policy_net(state_batch, action_batch)
 
         # Q-loss
-        elementwise_loss = torch.nn.functional.mse_loss(Q_values, expected_Q, reduction='none')
+        elementwise_loss = self.criterion(Q_values, expected_Q)
         
         # TD-error
-        td_error = torch.abs(Q_values - expected_Q).detach().cpu().numpy()
+        td_error = torch.abs(Q_values - expected_Q)
                         
         return elementwise_loss, td_error
 
@@ -217,11 +217,8 @@ class RainbowNAF(Agent):
         self.update_target(tau=tau)
 
         # PER: update priorities
-        new_priorities = td_error + self.priority_eps
+        new_priorities = td_error.detach().cpu().numpy() + self.priority_eps
         self.memory.update_priorities(indices, new_priorities)
-
-        self.policy_net.reset_noise()
-        self.target_net.reset_noise()
 
     def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict]:
         state, info = self.env.reset()
@@ -237,7 +234,7 @@ class RainbowNAF(Agent):
                 frames.append(Image.fromarray(frame))
 
             # Action selection and recording the transition
-            action = self.select_action(state)
+            action = self.select_action(state, noise=False)
             act = action.squeeze().cpu().numpy()
             opp_action = self.opponent.act(state) if self.hockey else None
             if self.hockey:
