@@ -3,10 +3,10 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: ddpg
-  - override /env: hockey-vs-basic
+  - override /env: hockey-vs-rainbow
 
 agent:
-  name: ddpg_hockey_bot_play_v1
+  name: ddpg_hockey_rainbow_play
   hidden_size: 400
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-3

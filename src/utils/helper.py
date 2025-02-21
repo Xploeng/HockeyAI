@@ -124,6 +124,8 @@ class OpponentWrapper:
             from agents.ddpg import DDPG
             from agents.rainbow import Rainbow
             if isinstance(self.opponent, Rainbow):
+                if not isinstance(state, torch.Tensor):
+                    state = torch.tensor(state, dtype=torch.float32, device=self.opponent.device)
                 action = self.opponent.select_action(state)
                 action = self.env.discrete_to_continous_action(action.item())
             elif isinstance(self.opponent, DDPG):

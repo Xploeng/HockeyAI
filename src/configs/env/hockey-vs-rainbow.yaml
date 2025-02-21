@@ -1,4 +1,4 @@
 name: Hockey-v0
 opponent_type: AgentOpponent
 opponent: 
-  name: rainbow_hockey_self_play
+  name: rainbow_hockey_bot_play_jules

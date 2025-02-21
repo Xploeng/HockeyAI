@@ -1,2 +1,2 @@
 _target_: utils.ReplayMemory
-capacity: 10000
+capacity: 1000000
