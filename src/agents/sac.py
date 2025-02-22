@@ -56,7 +56,6 @@ class SAC(Agent):
         self.hockey = True if opponent is not None or self.mode == "opponent" else False
         self.num_states = env.observation_space.shape[0]
         self.num_actions = env.action_space.shape[0]
-        ic(self.num_states, self.num_actions)
 
         if self.hockey:
             out_actions = int(self.num_actions / 2)
