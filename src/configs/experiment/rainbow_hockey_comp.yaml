@@ -6,7 +6,7 @@ defaults:
   - override /env: hockey
 
 agent:
-  name: rainbow_hockey_bot_composite
+  name: test
   requires_continues_action_space: True
 
   network:

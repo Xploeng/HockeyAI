@@ -117,6 +117,8 @@ class OpponentWrapper:
             action = self.opponent.act(state.squeeze().cpu().numpy())
         elif self.opp_type == 'agent':
             action = self.opponent.select_action(state)
-            action = self.env.discrete_to_continous_action(action.item()) if not self.requires_continues_action_space else action
-            
-        return action.squeeze().cpu().numpy()
+            if not self.requires_continues_action_space:
+                action = self.env.discrete_to_continous_action(action.item())
+            else:
+                action = action.squeeze().cpu().numpy()
+        return action

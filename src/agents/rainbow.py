@@ -129,7 +129,6 @@ class Rainbow(Agent):
             act = np.hstack([act, action_opp])
         else:
             act = action.item()
-
         next_state, reward, terminated, truncated, info = self.env.step(act)
         if self.hockey and self.composite_loss:
             reward += info["reward_touch_puck"] + info["reward_puck_direction"]
