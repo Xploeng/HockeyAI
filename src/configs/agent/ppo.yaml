@@ -1,0 +1,22 @@
+defaults:
+  - training: default
+  - memory: replay_buffer
+
+mode: train  # train/test or opponent
+
+# type: PPO Agent
+_target_: agents.ppo.PPO
+_recursive_: False
+name: PPO
+hidden_size: 256
+actor_learning_rate: 3e-4
+critic_learning_rate: 3e-4
+gamma: 0.99
+lam: 0.95
+clip_param: 0.2
+ppo_epochs: 10
+mini_batch_size: 64
+requires_continues_action_space: True
+memory:
+  _target_: utils.memory.ReplayBuffer
+  capacity: 1000000
