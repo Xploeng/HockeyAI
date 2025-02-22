@@ -3,10 +3,10 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow-naf
-  - override /env: hockey
+  - override /env: hockey-vs-naf
 
 agent:
-  name: rainbow_hockey_naf_composite
+  name: rainbow_hockey_naf_selfplay
   requires_continues_action_space: True
 
   network:

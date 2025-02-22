@@ -3,19 +3,20 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-  - override /env: hockey
+  - override /env: hockey-vs-rain
 
 agent:
-  name: rainbow_hockey_self_play
+  name: rainbow_hockey_bot_composite_selfplay
   requires_continues_action_space: True
 
   network:
     hidden_size: 256
 
   training:
+    composite_loss: True
     criterion: 
       reduction: 'none'
-    episodes: 200
+    episodes: 2000
     batch_size: 128
     save_agent: True
-    continue_training: True
+    continue_training: False

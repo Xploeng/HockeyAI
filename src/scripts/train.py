@@ -36,9 +36,9 @@ def initialize_opponent(cfg: DictConfig, env, device: torch.device):
         opp_cfg.agent.mode = 'opponent'
         
         opp, _ = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
-        return OpponentWrapper(opp, env)
+        return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space)
     elif cfg.env.opponent_type == "BasicOpponent":
-        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env)
+        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env, opp_cfg.agent.requires_continues_action_space)
 
 def initialize_environment(cfg: DictConfig):
     if cfg.env.name == "Hockey-v0":

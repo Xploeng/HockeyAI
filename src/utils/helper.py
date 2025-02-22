@@ -104,9 +104,10 @@ class DiscreteActionWrapper(gym.ActionWrapper):
         )
         
 class OpponentWrapper:
-    def __init__(self, opponent, env):
+    def __init__(self, opponent, env, requires_continues_action_space):
         self.env = env
         self.opponent = opponent
+        self.requires_continues_action_space = requires_continues_action_space
         
         self.opp_type = 'agent' if isinstance(opponent, Agent) else 'basic'
         
@@ -116,6 +117,6 @@ class OpponentWrapper:
             action = self.opponent.act(state.squeeze().cpu().numpy())
         elif self.opp_type == 'agent':
             action = self.opponent.select_action(state)
-            #action = self.env.discrete_to_continous_action(action.item())
+            action = self.env.discrete_to_continous_action(action.item()) if not self.requires_continues_action_space else action
             
         return action
