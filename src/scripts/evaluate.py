@@ -84,7 +84,8 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
 
     cfg.agent.training.continue_training = True
 
-    _ = load_checkpoint(cfg, agent, checkpoint_path, device)
+    episode = load_checkpoint(cfg, agent, checkpoint_path, device)
+    print(f"Loaded checkpoint from episode {episode}.")
 
     return agent
 
