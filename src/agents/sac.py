@@ -1,16 +1,13 @@
 import collections
-import copy
 import sys
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 import torch.optim as optim
 
 from gymnasium.spaces import Box
 from icecream import ic
 from PIL import Image
-from torch.autograd import Variable
 
 from .agent import Agent
 
@@ -131,8 +128,9 @@ class SAC(Agent):
                 # Get opponent actions for next states
                 if self.opponent.opp_type == "basic":
                     next_opponent_actions = self._batch_opponent_actions(next_states)
-                else:
+                else: # only sac opponent is supported atm
                     next_opponent_actions = self.opponent.act(next_states.unsqueeze(0))
+                    next_opponent_actions = torch.tensor(next_opponent_actions).to(self.device).squeeze(0)
                 next_joint_action = torch.cat([next_agent_action, next_opponent_actions], dim=1)
             else:
                 next_joint_action = next_agent_action
@@ -156,6 +154,7 @@ class SAC(Agent):
                 opponent_actions = self._batch_opponent_actions(states)
             else:
                 opponent_actions = self.opponent.act(states)
+                opponent_actions = torch.tensor(opponent_actions).to(self.device).squeeze(0)
             joint_actions = torch.cat([agent_action, opponent_actions], dim=1)
         else:
             joint_actions = agent_action
