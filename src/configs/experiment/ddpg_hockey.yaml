@@ -17,5 +17,5 @@ agent:
     episodes: 1001
     batch_size: 64
     save_agent: True
-    save_interval: 50
+    save_interval: 10
     continue_training: True

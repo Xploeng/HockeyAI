@@ -3,7 +3,7 @@
 defaults:
   - override /env: hockey-vs-basic
 
-agent: 'ddpg_hockey_bot_play'
+agent: 'ddpg_hockey_bot_play_v1'
 
 episodes: 100
 episode_max_steps: 200

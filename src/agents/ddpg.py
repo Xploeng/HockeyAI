@@ -53,7 +53,6 @@ class DDPG(Agent):
         self.hockey = True if opponent is not None or self.mode == "opponent" else False
         self.num_states = env.observation_space.shape[0]
         self.num_actions = env.action_space.shape[0]
-        ic(self.num_states, self.num_actions)
 
         if self.hockey:
             out_actions = int(self.num_actions / 2)
@@ -197,6 +196,7 @@ class DDPG(Agent):
             action = self.select_action(state)
             action = self.noise.select_action(action, step_idx)  # Exploration noise
             action_opp = self.opponent.act(state) if self.hockey else None
+            action_opp = action_opp.cpu().numpy() if isinstance(action_opp, torch.Tensor) else action_opp
             next_state, done = self.step(state, action, action_opp)
 
             self.optimize(self.batch_size)
@@ -239,6 +239,7 @@ class DDPG(Agent):
 
             # Hockey env opponent action and stacking if necessary
             action_opp = self.opponent.act(state) if self.hockey else None
+            action_opp = action_opp.cpu().numpy() if isinstance(action_opp, torch.Tensor) else action_opp
             action = np.hstack([action, action_opp]) if self.hockey else action
 
             # Take a step in the environment

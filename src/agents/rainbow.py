@@ -87,7 +87,16 @@ class Rainbow(Agent):
 
     def select_action(self, state):
         self.steps_done += 1
-        return self.policy_net(state).max(1).indices.view(1, 1)
+        # forward = self.policy_net(state)
+        # print(forward.shape)
+        # forward_max = forward.max(1)
+        # print(forward_max)
+        # final = forward_max.indices
+        # print(final.shape, final)
+        # final_view = final.view(1, 1)
+        # print(final_view.shape, final_view)
+        # return final_view
+        return self.policy_net(state).max(1).indices # .view(1, 1)
 
     def record(self, state, action, next_state, reward, done):
         return self.memory.push(state, action, next_state, reward, done)

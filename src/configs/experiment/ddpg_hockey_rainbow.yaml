@@ -18,4 +18,4 @@ agent:
     batch_size: 64
     save_agent: True
     save_interval: 50
-    continue_training: True
+    continue_training: False
