@@ -122,6 +122,57 @@ class RainbowHockeyAgent(Agent):
         )
 
 
+class SACHockeyAgent(Agent):
+    """A hockey agent that uses Soft Actor-Critic."""
+
+    def __init__(self, config_path: str) -> None:
+        super().__init__()
+        
+        # Initialize device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Load the config
+        with hydra.initialize(version_base=None, config_path="../configs"):
+            cfg = hydra.compose(config_name=config_path)
+            
+        # Initialize environment
+        self.env = h_env.HockeyEnv()
+            
+        # Initialize the SAC agent
+        self.sac = hydra.utils.instantiate(
+            config=cfg.agent,
+            env=self.env,
+            opponent=None,
+            device=self.device,
+            mode='opponent',
+            recursive=False,
+        )
+        
+        # Load the checkpoint
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/sac_hockey_bot_play_v0_last.ckpt"  # Update this path
+        if os.path.exists(checkpoint_path):
+            load_checkpoint(cfg, self.sac, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path}")
+        else:
+            raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
+
+    def get_step(self, observation: list[float]) -> list[float]:
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+        action = self.sac.select_action(state.squeeze(0), deterministic=True)
+        return action.tolist()
+
+    def on_start_game(self, game_id) -> None:
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        print(f"Game started (id: {game_id})")
+
+    def on_end_game(self, result: bool, stats: list[float]) -> None:
+        text_result = "won" if result else "lost"
+        print(
+            f"Game ended: {text_result} with my score: "
+            f"{stats[0]} against the opponent with score: {stats[1]}"
+        )
+
+
 # Function to initialize the agent.  This function is used with `launch_client` below,
 # to lauch the client and connect to the server.
 def initialize_agent(agent_args: list[str]) -> Agent:
@@ -130,15 +181,15 @@ def initialize_agent(agent_args: list[str]) -> Agent:
     parser.add_argument(
         "--agent",
         type=str,
-        choices=["weak", "strong", "random", "rainbow"],
+        choices=["weak", "strong", "random", "rainbow", "sac"],
         default="weak",
         help="Which agent to use.",
     )
     parser.add_argument(
         "--config",
         type=str,
-        default="rainbow_hockey_client.yaml",
-        help="Path to config file for Rainbow agent.",
+        default="sac_hockey_client.yaml",
+        help="Path to config file for Rainbow/SAC agent.",
     )
     args = parser.parse_args(agent_args)
 
@@ -152,6 +203,8 @@ def initialize_agent(agent_args: list[str]) -> Agent:
         agent = RandomAgent()
     elif args.agent == "rainbow":
         agent = RainbowHockeyAgent(config_path=args.config)
+    elif args.agent == "sac":
+        agent = SACHockeyAgent(config_path=args.config)
     else:
         raise ValueError(f"Unknown agent: {args.agent}")
 

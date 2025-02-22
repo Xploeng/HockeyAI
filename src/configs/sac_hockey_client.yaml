@@ -1,0 +1,9 @@
+defaults:
+  - _self_
+  - agent: sac
+
+
+agent:
+  name: sac_hockey_bot_play
+  requires_continues_action_space: False
+  mode: opponent
