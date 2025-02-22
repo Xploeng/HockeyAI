@@ -1,5 +1,4 @@
 import collections
-import copy
 import sys
 import numpy as np
 import torch
@@ -8,7 +7,6 @@ import torch.optim as optim
 
 from gymnasium.spaces import Box
 from icecream import ic
-from joblib import Parallel, delayed
 from PIL import Image
 from torch.autograd import Variable
 
@@ -135,7 +133,10 @@ class DDPG(Agent):
             target_actions = self.actor_target(next_states)
             if self.hockey:
                 # ic(next_states.shape)
-                target_opponent_actions = self._batch_opponent_actions(next_states)
+                if self.opponent.opp_type == "basic":
+                    target_opponent_actions = self._batch_opponent_actions(next_states)
+                else: # agent opponent use batched states (way faster)
+                    target_opponent_actions = self.opponent.act(next_states.unsqueeze(0))
                 target_actions = torch.cat([target_actions, target_opponent_actions], dim=1)
             target_q = self.critic_target(next_states, target_actions)
             q_target = rewards + self.gamma * target_q * (1 - dones)
@@ -155,7 +156,10 @@ class DDPG(Agent):
         # Actor loss
         if self.hockey:
             agent_actions = self.actor(states)
-            opponent_actions = self._batch_opponent_actions(states)
+            if self.opponent.opp_type == "basic":
+                opponent_actions = self._batch_opponent_actions(states)
+            else: # agent opponent use batched states (way faster)
+                opponent_actions = self.opponent.act(states)
             joint_actions = torch.cat([agent_actions, opponent_actions], dim=1)
             policy_loss = -self.critic(states, joint_actions).mean()
         else:
@@ -255,8 +259,8 @@ class DDPG(Agent):
         self.actor_optimizer.load_state_dict(agent_state_dict["actor_optimizer_state_dict"])
         self.critic_optimizer.load_state_dict(agent_state_dict["critic_optimizer_state_dict"])
 
-        self.memory = agent_state_dict["memory"]
-        self.steps_done = len(self.memory)
+        # self.memory = agent_state_dict["memory"]
+        # self.steps_done = len(self.memory)
 
     def state_dict(self):
         """Return the model and optimizer state dictionaries."""
@@ -268,6 +272,6 @@ class DDPG(Agent):
                 "critic_target_state_dict": self.critic_target.state_dict(),
                 "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
                 "critic_optimizer_state_dict": self.critic_optimizer.state_dict(),
-                "memory": self.memory,
+                # "memory": self.memory,
             },
         )
