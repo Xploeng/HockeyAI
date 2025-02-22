@@ -30,7 +30,6 @@ def get_checkpoint_path(agent_name):
 
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
-        # opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
         opp_cfg_pth = Path(".") / "src" / "outputs" / cfg.env.opponent.name / ".hydra" / "config.yaml"
         with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
@@ -78,7 +77,8 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     )
 
     start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
-    print(f"Loaded checkpoint for agent {agent.__class__.__name__} from episode {start_episode}.")
+    agent_or_opponent = 'agent' if opponent is None else 'opponent'
+    print(f"Loaded checkpoint for {agent_or_opponent} {agent.__class__.__name__} from episode {start_episode}.")
 
     return agent, start_episode
 

@@ -1,4 +1,4 @@
 name: Hockey-v0
 opponent_type: AgentOpponent
 opponent: 
-  name: sac_hockey_self_play
+  name: sac_hockey_bot_play_v0
