@@ -30,7 +30,6 @@ def get_checkpoint_path(agent_name):
 
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
-        # opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
         opp_cfg_pth = Path(".") / "src" / "outputs" / cfg.env.opponent.name / ".hydra" / "config.yaml"
         with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
