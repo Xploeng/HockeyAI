@@ -3,10 +3,10 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: sac
-  - override /env: hockey-vs-sac
+  - override /env: hockey-vs-rainbow
 
 agent:
-  name: sac_hockey_self_play_v0
+  name: sac_hockey_rainbow_play_v0
   hidden_size: 400
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-3

@@ -6,6 +6,79 @@ import torch.nn.functional as F  # noqa: N812
 from torchrl.modules import NoisyLinear
 
 
+class SACActor(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, log_std_min=-20, log_std_max=2):
+        super().__init__()
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
+        self.linear1 = nn.Linear(input_size, hidden_size)
+        self.linear2 = nn.Linear(hidden_size, hidden_size)
+        # Two linear layers for mean and log_std
+        self.mean_linear = nn.Linear(hidden_size, output_size)
+        self.log_std_linear = nn.Linear(hidden_size, output_size)
+
+    def forward(self, state):
+        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear2(x))
+        mean = self.mean_linear(x)
+        log_std = self.log_std_linear(x)
+        # Clamp log_std for numerical stability
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+        return mean, log_std
+
+    def sample(self, state):
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        # Reparameterization trick
+        normal = torch.distributions.Normal(mean, std)
+        x_t = normal.rsample()
+        # Apply tanh squashing
+        action = torch.tanh(x_t)
+        # Compute log_prob with correction for tanh squashing
+        log_prob = normal.log_prob(x_t) - torch.log(1 - action.pow(2) + 1e-6)
+        log_prob = log_prob.sum(dim=-1, keepdim=True)
+        return action, log_prob, mean
+
+    def select_action(self, state, deterministic=False):
+        state = torch.FloatTensor(state).unsqueeze(0).to(next(self.parameters()).device)
+        mean, log_std = self.forward(state)
+        if deterministic:
+            action = torch.tanh(mean)
+        else:
+            action, _, _ = self.sample(state)
+        return action.detach().cpu().numpy()[0]
+
+
+class SACCritic(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_size):
+        super().__init__()
+        # Q1 network
+        self.linear1 = nn.Linear(state_dim + action_dim, hidden_size)
+        self.linear2 = nn.Linear(hidden_size, hidden_size)
+        self.linear3 = nn.Linear(hidden_size, 1)
+        # Q2 network
+        self.linear4 = nn.Linear(state_dim + action_dim, hidden_size)
+        self.linear5 = nn.Linear(hidden_size, hidden_size)
+        self.linear6 = nn.Linear(hidden_size, 1)
+
+    def forward(self, state, action):
+        xu = torch.cat([state, action], dim=1)
+        # Q1
+        x1 = F.relu(self.linear1(xu))
+        x1 = F.relu(self.linear2(x1))
+        q1 = self.linear3(x1)
+        # Q2
+        x2 = F.relu(self.linear4(xu))
+        x2 = F.relu(self.linear5(x2))
+        q2 = self.linear6(x2)
+        return q1, q2
+
+    def min_q(self, state, action):
+        q1, q2 = self.forward(state, action)
+        return torch.min(q1, q2)
+
+
 class DQN(nn.Module):
     def __init__(self, n_actions, n_observations, hidden_size, **_):
         super().__init__()
