@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
 
-from torchrl.modules import NoisyLinear
+# from torchrl.modules import NoisyLinear
 
 
 class SACActor(nn.Module):

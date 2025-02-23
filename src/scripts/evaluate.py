@@ -174,9 +174,9 @@ def run_evaluations(cfg: DictConfig) -> None:
         agent_cfg.device = device
         agent_cfg.verbose = not silent
 
-    if agent_cfg.seed:
-        np.random.seed(agent_cfg.seed)
-        torch.manual_seed(agent_cfg.seed)
+    # if agent_cfg.seed:
+    #     np.random.seed(agent_cfg.seed)
+    #     torch.manual_seed(agent_cfg.seed)
 
     evaluate_model(cfg=cfg, agent_cfg=agent_cfg)
 

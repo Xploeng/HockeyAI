@@ -27,7 +27,7 @@ class SAC(Agent):
         memory,
         training,
         opponent,
-        hidden_size=256,
+        hidden_size=400,
         actor_learning_rate=3e-4,
         critic_learning_rate=3e-4,
         gamma=0.99,

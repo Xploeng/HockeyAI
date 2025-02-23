@@ -3,10 +3,10 @@
 defaults:
   - override /env: hockey-vs-basic
 
-agent: 'rainbow_hockey_bot_play'
+agent: 'rainbow_hockey_bot_composite'
 
-episodes: 1
+episodes: 100
 episode_max_steps: 200
 show_figures: True
 hockey : True
-render: True
+render: False

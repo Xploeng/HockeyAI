@@ -3,7 +3,7 @@
 defaults:
   - override /env: hockey-vs-basic
 
-agent: 'sac_hockey_bot_play_v0'
+agent: 'sac_hockey_self_play_strong'
 
 episodes: 100
 episode_max_steps: 200

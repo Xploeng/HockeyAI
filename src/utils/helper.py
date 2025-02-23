@@ -31,6 +31,7 @@ def load_checkpoint(cfg, agent, checkpoint_path, device):
             warnings.simplefilter("ignore", FutureWarning)
             checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         agent.load_state_dict(**checkpoint)
+        print(checkpoint.keys())
         return checkpoint.get("episode", 0)
     else:
         return 0

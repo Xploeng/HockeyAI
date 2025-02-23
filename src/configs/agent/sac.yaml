@@ -2,13 +2,13 @@ defaults:
   - memory: replay_buffer
   - training: default
 
-mode: train # train/test or opponent
+mode: opponent # train/test or opponent
 
 # type: SAC Agent
 _target_: agents.sac.SAC
 _recursive_: False
 name: SAC
-hidden_size: 256
+hidden_size: 400
 actor_learning_rate: 1e-4
 critic_learning_rate: 1e-3
 gamma: 0.99
