@@ -1,4 +1,4 @@
-agent: 'tdmpc'
+agent: 'tdmpc_pendulum'
 episodes: 5
 episode_max_steps: 200
 show_figures: True

@@ -147,6 +147,9 @@ class TDMPC(Agent):
 
     def record(self, state, action, next_state, reward, done):
         """Record transition in replay memory"""
+        assert len(action) == self.action_dim, f"Action dim mismatch: expected {self.action_dim}, got {len(action)}"
+        assert len(state) == self.num_states, f"State dim mismatch: expected {self.num_states}, got {len(state)}"
+        assert len(next_state) == self.num_states, f"Next state dim mismatch: expected {self.num_states}, got {len(next_state)}"
         self.memory.push(state, action, next_state, reward, done)
 
     def optimize(self, batch_size):
@@ -162,6 +165,10 @@ class TDMPC(Agent):
         next_states = torch.FloatTensor(np.array(batch.next_state)).to(self.device)
         rewards = torch.FloatTensor(batch.reward).to(self.device).unsqueeze(1)
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
+
+        # For hockey environment, only use agent's actions
+        if self.hockey:
+            actions = actions[:, :self.action_dim]
 
         # Update World Model with weighted loss
         pred_next_states = self.world_model.predict_next_state(states, actions)
@@ -221,15 +228,18 @@ class TDMPC(Agent):
 
     def step(self, state, action, action_opp=None):
         """Execute one step in the environment"""
-        action = np.hstack([action, action_opp]) if self.hockey else action
-        next_state, reward, terminated, truncated, _ = self.env.step(action)
+        # Store only agent's action in memory
+        full_action = np.hstack([action, action_opp]) if self.hockey else action
+        next_state, reward, terminated, truncated, _ = self.env.step(full_action)
         self.last_reward = torch.tensor([reward], device=self.device, dtype=torch.float32)
         done = terminated or truncated
 
         if terminated:
             next_state = np.zeros(self.num_states)
 
-        self.record(state, action, next_state, self.last_reward, done)
+        # Store only the agent's action portion
+        memory_action = action  # Don't include opponent's action
+        self.record(state, memory_action, next_state, self.last_reward, done)
         return next_state, done
 
     def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict, float]:

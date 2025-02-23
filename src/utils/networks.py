@@ -311,8 +311,13 @@ class WorldModel(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim, latent_dim):
         super().__init__()
         
+        # Store dimensions for debugging
+        self.obs_dim = obs_dim
+        self.action_dim = action_dim
+        self.input_dim = obs_dim + action_dim
+        
         self.encoder = nn.Sequential(
-            nn.Linear(obs_dim + action_dim, hidden_dim),
+            nn.Linear(self.input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -336,12 +341,26 @@ class WorldModel(nn.Module):
         )
 
     def predict_next_state(self, state, action):
-        latent = self.encoder(torch.cat([state, action], dim=-1))
+        # Ensure action has correct dimensions for hockey environment
+        if action.dim() == 3:  # If action comes from MPC planning
+            action = action.reshape(-1, self.action_dim)
+        elif action.dim() == 1:  # If single action
+            action = action.unsqueeze(0)
+            
+        x = torch.cat([state, action], dim=-1)
+        latent = self.encoder(x)
         next_state = self.dynamics(torch.cat([latent, action], dim=-1))
         return next_state
 
     def predict_reward(self, state, action, next_state):
-        return self.reward(torch.cat([state, action, next_state], dim=-1))
+        # Ensure action has correct dimensions
+        if action.dim() == 3:  # If action comes from MPC planning
+            action = action.reshape(-1, self.action_dim)
+        elif action.dim() == 1:  # If single action
+            action = action.unsqueeze(0)
+            
+        x = torch.cat([state, action, next_state], dim=-1)
+        return self.reward(x)
 
 
 class ValueFunction(nn.Module):
