@@ -6,7 +6,7 @@ defaults:
 
 device: cpu
 
-agent: 'tdmpc_pendulum'
+agent: 'tdmpc_bcl_pendulum'
 
 episodes: 5
 episode_max_steps: 200
