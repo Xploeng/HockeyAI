@@ -99,9 +99,9 @@ def run_training(cfg: DictConfig):
     """
     writer = tb.SummaryWriter(log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"))
 
-    if cfg.seed:
-        np.random.seed(cfg.seed)
-        torch.manual_seed(cfg.seed)
+    # if cfg.seed:
+    #     np.random.seed(cfg.seed)
+    #     torch.manual_seed(cfg.seed)
 
     device = torch.device(cfg.device)
     print(f"Using device: {device}")
