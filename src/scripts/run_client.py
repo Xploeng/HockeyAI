@@ -102,8 +102,10 @@ class RainbowHockeyAgent(Agent):
     def get_step(self, observation: list[float]) -> list[float]:
         state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         action = self.rainbow.select_action(state)
-        action = [self.env.env.discrete_to_continous_action(a.item()) for a in action]
-        return action[0]
+        print(action)
+        continuous_action = self.env.discrete_to_continous_action(action.item())
+        print(continuous_action)
+        return continuous_action
 
     def on_start_game(self, game_id) -> None:
         game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))

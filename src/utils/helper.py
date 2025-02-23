@@ -114,6 +114,7 @@ class OpponentWrapper:
         from agents.ddpg import DDPG
         from agents.rainbow import Rainbow
         from agents.sac import SAC
+        from agents.tdmpc import TDMPC
 
         if isinstance(opponent, DDPG):
             self.opp_type = "ddpg"
@@ -121,6 +122,8 @@ class OpponentWrapper:
             self.opp_type = "sac"
         elif isinstance(opponent, Rainbow):
             self.opp_type = "rainbow"
+        elif isinstance(opponent, TDMPC):
+            self.opp_type = "tdmpc"
         else:
             self.opp_type = "basic"
 
@@ -136,7 +139,7 @@ class OpponentWrapper:
             return self._act_basic(state)
         elif self.opp_type == "rainbow":
             return self._act_rainbow(state)
-        elif self.opp_type == "ddpg" or self.opp_type == "sac":
+        elif self.opp_type == "ddpg" or self.opp_type == "sac" or self.opp_type == "tdmpc":
             return self._act_ddpg_sac(state)
         else:
             raise ValueError(f"Unsupported opponent type: {self.opp_type}")

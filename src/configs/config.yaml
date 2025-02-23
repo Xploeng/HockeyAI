@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - agent: default
+  - agent: tdmpc_bcl
   - env: default
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
@@ -8,7 +8,7 @@ defaults:
 device: cuda:0
 seed: None
 verbose : True
-env: CartPole-v1
+env: Pendulum-v1
 
 hydra:
   run:

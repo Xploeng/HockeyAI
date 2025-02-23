@@ -1,0 +1,15 @@
+defaults:
+  - criterion: smooth_l1
+  - optimizer: adamW
+
+episodes: 1000
+batch_size: 128
+world_model_lr: 1e-3
+actor_lr: 1e-4
+value_lr: 1e-4
+tau: 0.005
+gamma: 0.99
+
+save_agent: True
+save_interval: 10
+continue_training: False 

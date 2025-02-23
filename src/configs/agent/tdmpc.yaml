@@ -1,0 +1,18 @@
+defaults: 
+  - memory: replay_buffer
+  - training: tdmpc
+  - _self_
+
+mode: train # train/test or opponent
+
+# type: TD-MPC Agent
+_target_: agents.tdmpc.TDMPC
+_recursive_: False
+name: TDMPC
+hidden_size: 256
+latent_dim: 50
+horizon: 5
+n_samples: 512
+mixture_coef: 0.05
+temperature: 0.5
+requires_continues_action_space: True 
