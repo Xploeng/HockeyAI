@@ -10,7 +10,6 @@ import sys
 import hockey.hockey_env as h_env
 import numpy as np
 sys.path.append("src/")
-from agents import Agent        
 from agents.rainbow import Rainbow
 from scripts.train import get_checkpoint_path
 from utils.helper import DiscreteActionWrapper, load_checkpoint
@@ -95,7 +94,8 @@ class RainbowHockeyAgent(Agent):
         )
         
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/rainbow_hockey_bot_composite_last.ckpt"
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/rainbow_hockey_bot_composite/checkpoints/rainbow_hockey_bot_composite_last.ckpt"
+        cfg.agent.training.continue_training = True
         if os.path.exists(checkpoint_path):
             load_checkpoint(cfg, self.rainbow, checkpoint_path, self.device)
             print(f"Loaded checkpoint from {checkpoint_path}")
@@ -105,10 +105,8 @@ class RainbowHockeyAgent(Agent):
     def get_step(self, observation: list[float]) -> list[float]:
         state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         action = self.rainbow.select_action(state)
-        print(action)
-        continuous_action = self.env.env.discrete_to_continous_action(action.item())
-        print(continuous_action)
-        return continuous_action
+        action = [self.env.env.discrete_to_continous_action(a.item()) for a in action]
+        return action[0]
 
     def on_start_game(self, game_id) -> None:
         game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
@@ -147,9 +145,9 @@ class SACHockeyAgent(Agent):
             mode='opponent',
             recursive=False,
         )
-        
+        cfg.agent.training.continue_training = True
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/sac_hockey_bot_play_v0_last.ckpt"  # Update this path
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/rainbow_hockey_bot_composite_last.ckpt"  # Update this path
         if os.path.exists(checkpoint_path):
             load_checkpoint(cfg, self.sac, checkpoint_path, self.device)
             print(f"Loaded checkpoint from {checkpoint_path}")
@@ -188,7 +186,7 @@ def initialize_agent(agent_args: list[str]) -> Agent:
     parser.add_argument(
         "--config",
         type=str,
-        default="sac_hockey_client.yaml",
+        default="rainbow_hockey_client.yaml",
         help="Path to config file for Rainbow/SAC agent.",
     )
     args = parser.parse_args(agent_args)
