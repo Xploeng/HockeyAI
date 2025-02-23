@@ -125,6 +125,7 @@ class OpponentWrapper:
             from agents.ddpg import DDPG
             from agents.rainbow import Rainbow
             from agents.sac import SAC
+            from agents.tdmpc import TDMPC
             
             if isinstance(self.opponent, Rainbow):
                 if not isinstance(state, torch.Tensor):
@@ -132,7 +133,7 @@ class OpponentWrapper:
                 action = self.opponent.select_action(state)
                 action = [self.env.discrete_to_continous_action(a.item()) for a in action]
                 action = torch.tensor(action, dtype=torch.float32, device=self.opponent.device).squeeze()
-            elif isinstance(self.opponent, (DDPG, SAC)):
+            elif isinstance(self.opponent, (DDPG, SAC, TDMPC)):
                 action = self.opponent.select_action(state)
 
         return action

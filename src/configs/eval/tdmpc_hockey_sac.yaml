@@ -3,7 +3,7 @@
 defaults:
   - override /env: hockey-vs-tdmpc
 
-agent: 'tdmpc_hockey_bot_play'
+agent: 'tdmpc_hockey_sac_play'
 
 episodes: 50
 episode_max_steps: 200
