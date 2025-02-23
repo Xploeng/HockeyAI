@@ -15,13 +15,12 @@
             "cwd": "${workspaceFolder}"
         },
         {
-            "name": "Evaluate PPO",
+            "name": "Evaluate TDMPC",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/scripts/evaluate.py",
             "args": [
-                "-c",
-                "outputs/ppo"
+                "+eval=tdmpc_hockey_bot.yaml"
             ],
             "console": "integratedTerminal",
             "justMyCode": true,

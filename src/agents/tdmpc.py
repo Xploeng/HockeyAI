@@ -147,6 +147,10 @@ class TDMPC(Agent):
 
     def record(self, state, action, next_state, reward, done):
         """Record transition in replay memory"""
+        # For hockey environment, only store agent's actions
+        if self.hockey and len(action) == self.num_actions:
+            action = action[:self.action_dim]
+            
         assert len(action) == self.action_dim, f"Action dim mismatch: expected {self.action_dim}, got {len(action)}"
         assert len(state) == self.num_states, f"State dim mismatch: expected {self.num_states}, got {len(state)}"
         assert len(next_state) == self.num_states, f"Next state dim mismatch: expected {self.num_states}, got {len(next_state)}"
