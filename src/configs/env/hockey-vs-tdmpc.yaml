@@ -1,0 +1,4 @@
+name: Hockey-v0
+opponent_type: AgentOpponent
+opponent: 
+  name: tdmpc_hockey_sac_play

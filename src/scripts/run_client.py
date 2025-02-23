@@ -168,6 +168,113 @@ class SACHockeyAgent(Agent):
         print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
+class TDMPCHockeyAgent(Agent):
+    """A hockey agent that uses TD-MPC."""
+
+    def __init__(self, config_path: str) -> None:
+        super().__init__()
+        
+        # Initialize device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Load the config
+        with hydra.initialize(version_base=None, config_path="../configs"):
+            cfg = hydra.compose(config_name=config_path)
+            
+        # Initialize environment
+        self.env = h_env.HockeyEnv()
+        
+        # Force full action space for world model to match training
+        full_action_dim = self.env.action_space.shape[0] # 4 for hockey
+        
+        # Initialize the TDMPC agent with full action dim for world model
+        self.tdmpc = hydra.utils.instantiate(
+            config=cfg.agent,
+            env=self.env,
+            opponent=None,
+            device=self.device,
+            mode='opponent',
+            action_dim=full_action_dim,  # Force full action dimension
+            recursive=False,
+        )
+        
+        # Load the checkpoint
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_hockey_sac_play/checkpoints/tdmpc_hockey_sac_play_last.ckpt"
+        cfg.agent.training.continue_training = True
+        if os.path.exists(checkpoint_path):
+            load_checkpoint(cfg, self.tdmpc, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path}")
+        else:
+            raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
+
+    def get_step(self, observation: list[float]) -> list[float]:
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        action = self.tdmpc.select_action(state, evaluate=True)
+        return action.tolist()
+
+    def on_start_game(self, game_id) -> None:
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        print(f"Game started (id: {game_id})")
+
+    def on_end_game(self, result: bool, stats: list[float]) -> None:
+        text_result = "won" if result else "lost"
+        print(
+            f"Game ended: {text_result} with my score: "
+            f"{stats[0]} against the opponent with score: {stats[1]}"
+        )
+
+
+class TDMPCBCLHockeyAgent(Agent):
+    """A hockey agent that uses TD-MPC with Behavioral Cloning."""
+
+    def __init__(self, config_path: str) -> None:
+        super().__init__()
+        
+        # Initialize device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Load the config
+        with hydra.initialize(version_base=None, config_path="../configs"):
+            cfg = hydra.compose(config_name=config_path)
+            
+        # Initialize environment
+        self.env = h_env.HockeyEnv()
+        full_action_dim = self.env.action_space.shape[0] # 4 for hockey
+
+        # Initialize the TDMPC_BCL agent
+        self.tdmpc_bcl = hydra.utils.instantiate(
+            config=cfg.agent,
+            env=self.env,
+            opponent=None,
+            device=self.device,
+            mode='opponent',
+            action_dim=full_action_dim,  # Force full action dimension
+            recursive=False,
+        )
+        
+        # Load the checkpoint
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/tdmpc_bcl_hockey_tdmpc_play.ckpt"
+        cfg.agent.training.continue_training = True
+        if os.path.exists(checkpoint_path):
+            load_checkpoint(cfg, self.tdmpc_bcl, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path}")
+        else:
+            raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
+
+    def get_step(self, observation: list[float]) -> list[float]:
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        action = self.tdmpc_bcl.select_action(state, evaluate=True)
+        return action.tolist()
+
+    def on_start_game(self, game_id) -> None:
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
+        print(f"Game started (id: {game_id})")
+
+    def on_end_game(self, result: bool, stats: list[float]) -> None:
+        text_result = "won" if result else "lost"
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
+
+
 # Function to initialize the agent.  This function is used with `launch_client` below,
 # to lauch the client and connect to the server.
 def initialize_agent(agent_args: list[str]) -> Agent:
@@ -176,7 +283,7 @@ def initialize_agent(agent_args: list[str]) -> Agent:
     parser.add_argument(
         "--agent",
         type=str,
-        choices=["weak", "strong", "random", "rainbow", "sac"],
+        choices=["weak", "strong", "random", "rainbow", "sac", "tdmpc", "tdmpc_bcl"],
         default="weak",
         help="Which agent to use.",
     )
@@ -200,6 +307,10 @@ def initialize_agent(agent_args: list[str]) -> Agent:
         agent = RainbowHockeyAgent(config_path=args.config)
     elif args.agent == "sac":
         agent = SACHockeyAgent(config_path=args.config)
+    elif args.agent == "tdmpc":
+        agent = TDMPCHockeyAgent(config_path=args.config)
+    elif args.agent == "tdmpc_bcl":
+        agent = TDMPCBCLHockeyAgent(config_path=args.config)
     else:
         raise ValueError(f"Unknown agent: {args.agent}")
 
