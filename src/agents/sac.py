@@ -62,10 +62,10 @@ class SAC(Agent):
                 dtype=env.action_space.dtype,
             )
             self.actor = SACActor(self.num_states, hidden_size, out_actions).to(self.device)
-            self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_learning_rate)
+            self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=actor_learning_rate)
 
             self.critic = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
-            self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_learning_rate)
+            self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=critic_learning_rate)
 
             # Target critic
             self.critic_target = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
@@ -73,10 +73,10 @@ class SAC(Agent):
         else:
             self.agent_action_space = env.action_space
             self.actor = SACActor(self.num_states, hidden_size, self.num_actions).to(self.device)
-            self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_learning_rate)
+            self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=actor_learning_rate)
 
             self.critic = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
-            self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_learning_rate)
+            self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=critic_learning_rate)
 
             self.critic_target = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
             self.critic_target.load_state_dict(self.critic.state_dict())
@@ -84,7 +84,7 @@ class SAC(Agent):
         # Temperature parameter for entropy regularization
         self.log_alpha = torch.tensor(np.log(self.alpha)).to(self.device)
         self.log_alpha.requires_grad = True
-        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=actor_learning_rate)
+        self.alpha_optimizer = optim.AdamW([self.log_alpha], lr=actor_learning_rate)
 
         # Set target entropy (e.g. -dim(action))
         if self.hockey:
