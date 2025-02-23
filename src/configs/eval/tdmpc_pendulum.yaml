@@ -1,5 +1,5 @@
-agent: 'pendulum_ppo'
-episodes: 1
+agent: 'tdmpc'
+episodes: 5
 episode_max_steps: 200
 show_figures: True
 hockey: False
