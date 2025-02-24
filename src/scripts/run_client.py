@@ -270,34 +270,6 @@ class TDMPCBCLHockeyAgent(Agent):
         # Player 2 starts on the right side (positive x)
         return observation[0] > 0  # x position of our player
 
-    def _mirror_state(self, state: list[float]) -> torch.Tensor:
-        """Mirror the state for player 2's perspective"""
-        mirrored = state.copy()
-        # Mirror positions (x coordinates)
-        mirrored[0] = -state[0]   # player x
-        mirrored[1] = state[1]    # player y remains same
-        mirrored[2] = state[2]    # angle remains same
-        # Mirror velocities
-        mirrored[3] = -state[3]   # player x velocity
-        mirrored[4] = state[4]    # player y velocity remains same
-        mirrored[5] = state[5]    # angular velocity remains same
-        # Mirror opponent
-        mirrored[6] = -state[6]   # opponent x
-        mirrored[7] = state[7]    # opponent y
-        mirrored[8] = state[8]    # opponent angle
-        mirrored[9] = -state[9]   # opponent x velocity
-        mirrored[10] = state[10]  # opponent y velocity
-        mirrored[11] = state[11]  # opponent angular velocity
-        # Mirror puck
-        mirrored[12] = -state[12] # puck x
-        mirrored[13] = state[13]  # puck y
-        mirrored[14] = -state[14] # puck x velocity
-        mirrored[15] = state[15]  # puck y velocity
-        # Mirror puck possession if present
-        if len(state) > 16:
-            mirrored[16] = state[17]  # swap possession indicators
-            mirrored[17] = state[16]
-        return torch.tensor(mirrored, dtype=torch.float32, device=self.device)
 
     def get_step(self, observation: list[float]) -> list[float]:
         # Detect which side we're playing on
@@ -305,17 +277,13 @@ class TDMPCBCLHockeyAgent(Agent):
         
         # Mirror the state if we're player 2
         if is_player_two:
-            state = self._mirror_state(observation)
+            state = self.env.obs_agent_two()
         else:
             state = torch.tensor(observation, dtype=torch.float32, device=self.device)
         
         # Get action from model
         action = self.tdmpc_bcl.select_action(state, evaluate=True)
-        
-        # Mirror the action back if we're player 2
-        if is_player_two:
-            action = -action  # Negate x-direction actions
-            
+                    
         return action.tolist()
 
     def on_start_game(self, game_id) -> None:
