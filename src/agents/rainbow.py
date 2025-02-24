@@ -114,7 +114,10 @@ class Rainbow(Agent):
         while not done:
             action = self.select_action(state)
 
-            opp_action = self.opponent.act(state) if self.hockey else None
+            opp_action = None
+            if self.hockey:
+                opp_state = self.env.obs_agent_two()
+                opp_action = self.opponent.act(opp_state)
             next_state, reward, done = self.step(state, action, opp_action)
             
             self.reward += reward
@@ -256,8 +259,10 @@ class Rainbow(Agent):
 
             # Action selection and recording the transition
             action = self.select_action(state)
-            opp_action = self.opponent.act(state) if self.hockey else None
+            opp_action = None
             if self.hockey:
+                opp_state = self.env.obs_agent_two()
+                opp_action = self.opponent.act(opp_state)
                 act = self.env.discrete_to_continous_action(action.item())
                 act = np.hstack([act, opp_action])
             else:

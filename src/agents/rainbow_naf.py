@@ -115,7 +115,10 @@ class RainbowNAF(Agent):
         while not done:
             action = self.select_action(state, noise=True)
 
-            opp_action = self.opponent.act(state) if self.hockey else None
+            opp_action = None
+            if self.hockey:
+                opp_state = self.env.obs_agent_two()
+                opp_action = self.opponent.act(opp_state)
             next_state, reward, done = self.step(state, action, opp_action)
             
             self.reward += reward
@@ -235,8 +238,10 @@ class RainbowNAF(Agent):
             # Action selection and recording the transition
             action = self.select_action(state, noise=False)
             act = action.squeeze().cpu().numpy()
-            opp_action = self.opponent.act(state) if self.hockey else None
+            opp_action = None
             if self.hockey:
+                opp_state = self.env.obs_agent_two()
+                opp_action = self.opponent.act(opp_state)
                 act = np.hstack([act, opp_action])
 
             next_state, reward, terminated, truncated, info = self.env.step(act)

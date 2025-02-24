@@ -114,7 +114,7 @@ class OpponentWrapper:
     def act(self, state: torch.Tensor):
         action = None
         if self.opp_type == 'basic':
-            action = self.opponent.act(state.squeeze().cpu().numpy())
+            action = self.opponent.act(state)
         elif self.opp_type == 'agent':
             action = self.opponent.select_action(state)
             if not self.requires_continues_action_space:
