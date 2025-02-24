@@ -1,11 +1,11 @@
 # @package _global_
 
 defaults:
-  - override /env: hockey-vs-tdmpc
+  - override /env: hockey-vs-basic
 
-agent: 'sac_hockey_bot_play_v0'
+agent: 'tdmpc_bcl_hockey_tdmpc_play'
 
-episodes: 10
+episodes: 15
 episode_max_steps: 200
 show_figures: True
 hockey : True

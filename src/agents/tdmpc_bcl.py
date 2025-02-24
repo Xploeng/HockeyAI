@@ -269,7 +269,9 @@ class TDMPC_BCL(Agent):
 
         while not done:
             action = self.select_action(state)
-            action_opp = self.opponent.act(state) if self.hockey else None
+            # Get opponent state and action
+            opp_state = self.env.obs_agent_two() if self.hockey else None
+            action_opp = self.opponent.act(opp_state) if self.hockey else None
             next_state, done = self.step(state, action, action_opp)
             total_reward += self.last_reward.item()
             self.optimize(self.batch_size)
@@ -308,14 +310,18 @@ class TDMPC_BCL(Agent):
                     frames.append(Image.fromarray(frame))
 
             action = self.select_action(state, evaluate=True)
-            action_opp = self.opponent.act(state) if self.hockey else None
-            action = np.hstack([action, action_opp]) if self.hockey else action
+            # Get opponent state and action
+            opp_state = self.env.obs_agent_two() if self.hockey else None
+            action_opp = self.opponent.act(opp_state) if self.hockey else None
+            full_action = np.hstack([action, action_opp]) if self.hockey else action
             
-            next_state, reward, terminated, truncated, info = self.env.step(action)
+            next_state, reward, terminated, truncated, info = self.env.step(full_action)
             total_reward += reward
             done = terminated or truncated
             
-            self.record(state, action, next_state, torch.tensor([reward], device=self.device), done)
+            # Record only the agent's action, not the full action
+            memory_action = action
+            self.record(state, memory_action, next_state, torch.tensor([reward], device=self.device), done)
             state = next_state
 
         return frames, info
