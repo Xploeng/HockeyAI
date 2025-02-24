@@ -83,11 +83,21 @@ class TDMPC_BCL(Agent):
             latent_dim=latent_dim
         ).to(device)
         
-        self.actor = Actor(
-            self.num_states,
-            hidden_size,
-            self.action_dim
-        ).to(device)
+        if self.hockey:
+            opp_action_dim = self.action_dim  # Use opponent action dimension (e.g., if agent action is 4, then opp actions are 4)
+            self.actor = Actor(
+                 self.num_states,
+                 opp_action_dim,
+                 hidden_size,
+                 self.action_dim
+            ).to(device)
+        else:
+            self.actor = Actor(
+                 self.num_states,
+                 0,  # No opponent info
+                 hidden_size,
+                 self.action_dim
+            ).to(device)
         
         self.value_function = ValueFunction(
             self.num_states,
@@ -104,22 +114,35 @@ class TDMPC_BCL(Agent):
 
     def select_action(self, state, evaluate=False):
         """Select action using MPC planning when training, or actor for evaluation"""
-        assert state.shape[-1] == self.num_states, f"Expected state dim {self.num_states}, got {state.shape}"
         state = torch.FloatTensor(state).to(self.device)
+        opp_action = None
+        if self.hockey:
+            opp_obs = self.env.obs_agent_two()         # Get the opponent's observation
+            opp_action = self.opponent.act(opp_obs)      # Compute the opponent's action from its observation
+            opp_action = torch.FloatTensor(opp_action).to(self.device)
         
         if evaluate or self.mode != "train":
             with torch.no_grad():
-                action = self.actor(state)
+                if opp_action is not None:
+                    action = self.actor(state, opp_action)
+                else:
+                    action = self.actor(state)
                 return action.cpu().numpy()
 
-        # MPC Planning with batched operations
+        # Training mode with MPC planning.
         state = state.repeat(self.n_samples, 1)
         actions = torch.zeros(self.n_samples, self.horizon, self.action_dim).to(self.device)
         
         with torch.no_grad():
             current_state = state
+            if opp_action is not None:
+                opp_action = opp_action.repeat(self.n_samples, 1)
             for t in range(self.horizon):
-                actor_actions = self.actor(current_state)
+                # Include opponent information (i.e. opponent action) when calling the actor
+                if opp_action is not None:
+                    actor_actions = self.actor(current_state, opp_action)
+                else:
+                    actor_actions = self.actor(current_state)
                 noise = torch.randn_like(actor_actions) * self.temperature
                 actions[:, t] = torch.clamp(actor_actions + noise, self.action_low, self.action_high)
                 current_state = self.world_model.predict_next_state(current_state, actions[:, t])
@@ -130,26 +153,37 @@ class TDMPC_BCL(Agent):
         
         return actions[best_idx, 0].cpu().numpy()
 
-    def batched_select_action(self, states):
-        """Batched MPC planning to select best initial actions for multiple states"""
+    def batched_select_action(self, states, opp_actions=None):
+        """Batched MPC planning to select best initial actions for multiple states, using opponent actions if available"""
         B = states.size(0)  # Batch size
         total_samples = B * self.n_samples
         states_expanded = states.unsqueeze(1).repeat(1, self.n_samples, 1).view(total_samples, -1)
         actions = torch.zeros(B, self.n_samples, self.horizon, self.action_dim).to(self.device)
         
+        # Expand opponent actions if provided.
+        if opp_actions is not None:
+            opp_actions_expanded = opp_actions.unsqueeze(1).repeat(1, self.n_samples, 1).view(total_samples, -1)
         with torch.no_grad():
             current_states = states_expanded.clone()
             for t in range(self.horizon):
-                actor_actions = self.actor(current_states).view(B, self.n_samples, self.action_dim)
+                if self.hockey:
+                    # If opponent actions are available, use them; otherwise, use a dummy zero vector.
+                    current_opp = opp_actions_expanded if opp_actions is not None else torch.zeros_like(current_states)
+                    actor_actions = self.actor(current_states, current_opp).view(B, self.n_samples, self.action_dim)
+                else:
+                    actor_actions = self.actor(current_states).view(B, self.n_samples, self.action_dim)
                 noise = torch.randn_like(actor_actions) * self.temperature
                 actions[:, :, t, :] = torch.clamp(actor_actions + noise, self.action_low, self.action_high)
                 next_states = self.world_model.predict_next_state(
                     current_states, actions[:, :, t, :].view(total_samples, -1)
                 )
                 current_states = next_states
-        
-        # Evaluate trajectories
-        values = self.batched_evaluate_trajectories(states, actions)
+
+        # Evaluate trajectories.
+        if self.hockey:
+            values = self.batched_evaluate_trajectories(states, actions, opp_actions)
+        else:
+            values = self.batched_evaluate_trajectories(states, actions)
         best_indices = values.view(B, self.n_samples).argmax(dim=1)
         best_actions = actions[torch.arange(B), best_indices, 0, :]
         return best_actions
@@ -173,8 +207,8 @@ class TDMPC_BCL(Agent):
         total_value += (self.gamma ** self.horizon) * self.value_function(current_state).squeeze(-1)
         return total_value
 
-    def batched_evaluate_trajectories(self, states, actions):
-        """Evaluate trajectories for a batch of states"""
+    def batched_evaluate_trajectories(self, states, actions, opp_actions=None):
+        """Evaluate trajectories for a batch of states; opponent actions can be used for planning if available"""
         B, N, H, _ = actions.shape
         total_samples = B * N
         total_value = torch.zeros(total_samples).to(self.device)
@@ -186,28 +220,21 @@ class TDMPC_BCL(Agent):
             rewards = self.world_model.predict_reward(current_states, actions_t, next_states)
             if rewards.dim() > 1:
                 rewards = rewards.squeeze(-1)
-            
             total_value += (self.gamma ** t) * rewards
             current_states = next_states
         
         total_value += (self.gamma ** H) * self.value_function(current_states).squeeze(-1)
         return total_value
 
-    def record(self, state, action, next_state, reward, done):
-        """Record transition in replay memory, including opponent action if available"""
+    def record(self, state, action, next_state, reward, done, opp_action=None):
+        """Record transition in replay memory including the opponent's action"""
+        assert len(action) == self.action_dim, f"Action dim mismatch: expected {self.action_dim}, got {len(action)}"
         assert len(state) == self.num_states, f"State dim mismatch: expected {self.num_states}, got {len(state)}"
         assert len(next_state) == self.num_states, f"Next state dim mismatch: expected {self.num_states}, got {len(next_state)}"
-        
-        # For hockey environment, action contains both agent and opponent actions
-        if self.hockey and len(action) == self.num_actions:
-            agent_action = action[:self.action_dim]
-            opp_action = action[self.action_dim:]
-            self.memory.push(state, (agent_action, opp_action), next_state, reward, done)
-        else:
-            self.memory.push(state, action, next_state, reward, done)
+        self.memory.push(state, action, opp_action, next_state, reward, done)
 
     def optimize(self, batch_size):
-        """Optimize world model, actor, and value function with behavioral cloning"""
+        """Optimize world model, actor, and value function with behavioral cloning including opponent actions"""
         if len(self.memory) < max(batch_size, self.min_buffer_size):
             return
 
@@ -215,25 +242,19 @@ class TDMPC_BCL(Agent):
         batch = Transition(*zip(*transitions))
 
         states = torch.FloatTensor(np.array(batch.state)).to(self.device)
+        actions = torch.FloatTensor(np.array(batch.action)).to(self.device)
+        opp_actions = None
+        if self.hockey:
+            opp_actions = torch.FloatTensor(np.array(batch.opp_action)).to(self.device)
         next_states = torch.FloatTensor(np.array(batch.next_state)).to(self.device)
         rewards = torch.FloatTensor(batch.reward).to(self.device).unsqueeze(1)
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
 
-        # Handle actions differently for hockey environment
         if self.hockey:
-            # Unpack agent and opponent actions
-            agent_actions, opp_actions = zip(*batch.action)
-            actions = torch.FloatTensor(np.array(agent_actions)).to(self.device)
-            opp_actions = torch.FloatTensor(np.array(opp_actions)).to(self.device)
-            
-            # Concatenate actions for world model prediction
-            combined_actions = torch.cat([actions, opp_actions], dim=1)
-            pred_next_states = self.world_model.predict_next_state(states, combined_actions)
-        else:
-            actions = torch.FloatTensor(np.array(batch.action)).to(self.device)
-            pred_next_states = self.world_model.predict_next_state(states, actions)
+            actions = actions[:, :self.action_dim]
 
         # Update World Model
+        pred_next_states = self.world_model.predict_next_state(states, actions)
         pred_rewards = self.world_model.predict_reward(states, actions, next_states)
         state_loss = torch.nn.functional.mse_loss(pred_next_states, next_states)
         reward_loss = torch.nn.functional.mse_loss(pred_rewards, rewards)
@@ -258,14 +279,17 @@ class TDMPC_BCL(Agent):
         self.value_optimizer.step()
 
         # Update Actor with Behavioral Cloning
-        actor_actions = self.actor(states)
+        if self.hockey:
+            actor_actions = self.actor(states, opp_actions)
+        else:
+            actor_actions = self.actor(states)
         next_states_pred = self.world_model.predict_next_state(states, actor_actions)
         pred_rewards = self.world_model.predict_reward(states, actor_actions, next_states_pred)
         pred_values = self.value_function(next_states_pred)
         actor_loss = -(pred_rewards + self.gamma * pred_values).mean()
 
         # Behavioral cloning loss
-        mpc_actions = self.batched_select_action(states)
+        mpc_actions = self.batched_select_action(states, opp_actions)
         bc_loss = torch.nn.functional.mse_loss(actor_actions, mpc_actions)
         total_actor_loss = actor_loss + self.alpha * bc_loss
 
@@ -297,7 +321,7 @@ class TDMPC_BCL(Agent):
         return total_reward
 
     def step(self, state, action, action_opp=None):
-        """Execute one step in the environment"""
+        """Execute one step in the environment and record the opponent's action"""
         full_action = np.hstack([action, action_opp]) if self.hockey else action
         next_state, reward, terminated, truncated, _ = self.env.step(full_action)
         self.last_reward = torch.tensor([reward], device=self.device, dtype=torch.float32)
@@ -306,9 +330,8 @@ class TDMPC_BCL(Agent):
         if terminated:
             next_state = np.zeros(self.num_states)
 
-        # Store both agent and opponent actions when in hockey environment
-        memory_action = full_action if self.hockey else action
-        self.record(state, memory_action, next_state, self.last_reward, done)
+        memory_action = action  # we record only our agent's action for replay
+        self.record(state, memory_action, next_state, self.last_reward, done, opp_action=action_opp)
         return next_state, done
 
     def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict, float]:
@@ -337,7 +360,7 @@ class TDMPC_BCL(Agent):
             
             # Record only the agent's action, not the full action
             memory_action = action
-            self.record(state, memory_action, next_state, torch.tensor([reward], device=self.device), done)
+            self.record(state, memory_action, next_state, torch.tensor([reward], device=self.device), done, action_opp)
             state = next_state
 
         return frames, info

@@ -152,20 +152,21 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, opp_input_size, hidden_size, output_size):
         super().__init__()
-        self.linear1 = nn.Linear(input_size, hidden_size)
+        self.input_size = input_size + opp_input_size  # Include opponent state/action
+        self.linear1 = nn.Linear(self.input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, output_size)
 
-    def forward(self, state):
-        """
-        Param state is a torch tensor
-        """
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
+    def forward(self, state, opp_input=None):
+        if opp_input is not None:
+            x = torch.cat([state, opp_input], dim=-1)
+        else:
+            x = state  # Fallback if no opponent input is provided
+        x = torch.relu(self.linear1(x))
+        x = torch.relu(self.linear2(x))
         x = torch.tanh(self.linear3(x))
-
         return x
 
     def max_q(self, observations):

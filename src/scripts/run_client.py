@@ -94,7 +94,7 @@ class RainbowHockeyAgent(Agent):
         )
         cfg.agent.training.continue_training = True
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/rainbow_hockey_bot_composite_last.ckpt"
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/rainbow_hockey_bot_0/checkpoints/rainbow_hockey_bot_last.ckpt"
         if os.path.exists(checkpoint_path):
             eps = load_checkpoint(cfg, self.rainbow, checkpoint_path, self.device)
             print(f"Loaded checkpoint from {checkpoint_path} eps: {eps}")
@@ -298,7 +298,7 @@ def initialize_agent(agent_args: list[str]) -> Agent:
     parser.add_argument(
         "--config",
         type=str,
-        default="tdmpc_bcl_hockey_client.yaml",
+        default="rainbow_hockey_client.yaml",
         help="Path to config file for Rainbow/SAC/TDMPC agent.",
     )
     args = parser.parse_args(agent_args)

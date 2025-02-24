@@ -9,7 +9,7 @@ from .segment_tree import MinSegmentTree, SumSegmentTree
 
 Transition = namedtuple(
     "Transition",
-    ("state", "action", "next_state", "reward", "done"),
+    ("state", "action", "opp_action", "next_state", "reward", "done"),
 )
 
 
@@ -22,8 +22,8 @@ class ReplayMemory:
     def __len__(self) -> int:
         return self.size
 
-    def push(self, *args) -> None:
-        self.memory[self.ptr] = Transition(*args)
+    def push(self, state, action, opp_action, next_state, reward, done) -> None:
+        self.memory[self.ptr] = Transition(state, action, opp_action, next_state, reward, done)
         self.ptr = (self.ptr + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
 
@@ -166,7 +166,7 @@ class NStepBuffer:
         reward, next_state, done = self._get_n_step_info(self.n_step_buffer, self.gamma)
         state, action = self.n_step_buffer[0][:2]
 
-        self.memory.push(*(state, action, next_state, reward, done))
+        self.memory.push(*(state, action, transition.opp_action, next_state, reward, done))
 
         return self.n_step_buffer[0]
 
