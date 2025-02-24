@@ -100,9 +100,9 @@ class SAC(Agent):
             return np.clip(action, action_space.low, action_space.high)
         return action
 
-    def record(self, state, action, next_state, reward, done):
+    def record(self, state, action, next_state, opp_next_state, reward, done):
         """Record the transition in the replay memory."""
-        self.memory.push(state, action, next_state, reward, done)
+        self.memory.push(state, action, next_state, opp_next_state, reward, done)
 
     def optimize(self, batch_size):
         if len(self.memory) < batch_size:
@@ -118,6 +118,7 @@ class SAC(Agent):
         actions = torch.FloatTensor(np.array(batch.action)).to(self.device)
         rewards = torch.FloatTensor(batch.reward).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.array(batch.next_state)).to(self.device)
+        opp_next_states = torch.FloatTensor(np.array(batch.opp_next_state)).to(self.device) if self.hockey else None
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
 
         # --- Critic Update ---
@@ -127,10 +128,10 @@ class SAC(Agent):
             if self.hockey:
                 # Get opponent actions for next states
                 if self.opponent.opp_type == "basic":
-                    next_opponent_actions = self._batch_opponent_actions(next_states)
+                    next_opponent_actions = self._batch_opponent_actions(opp_next_states)
                 else: # only sac opponent is supported atm
                     next_opponent_actions = self.opponent.act(next_states.unsqueeze(0))
-                    next_opponent_actions = torch.tensor(next_opponent_actions).to(self.device).squeeze(0)
+                    next_opponent_actions = torch.tensor(opp_next_states).to(self.device).squeeze(0)
                 next_joint_action = torch.cat([next_agent_action, next_opponent_actions], dim=1)
             else:
                 next_joint_action = next_agent_action
@@ -151,9 +152,9 @@ class SAC(Agent):
         agent_action, log_prob, _ = self.actor.sample(states)
         if self.hockey:
             if self.opponent.opp_type == "basic":
-                opponent_actions = self._batch_opponent_actions(states)
+                opponent_actions = self._batch_opponent_actions(opp_next_states)
             else:
-                opponent_actions = self.opponent.act(states)
+                opponent_actions = self.opponent.act(opp_next_states)
                 opponent_actions = torch.tensor(opponent_actions).to(self.device).squeeze(0)
             joint_actions = torch.cat([agent_action, opponent_actions], dim=1)
         else:
@@ -187,13 +188,13 @@ class SAC(Agent):
 
     def train_episode(self) -> None:
         state, _ = self.env.reset()
-        # Reset any noise if applicable (SAC doesn't typically use external noise)
         done = False
         step_idx = 0
         while not done:
             action = self.select_action(state)
             # When interacting with the environment, the opponent acts as before
-            action_opp = self.opponent.act(state) if self.hockey else None
+            opp_state = self.env.obs_agent_two() if self.hockey else None
+            action_opp = self.opponent.act(opp_state) if self.hockey else None
             action_opp = action_opp.cpu().numpy() if isinstance(action_opp, torch.Tensor) else action_opp
             next_state, done = self.step(state, action, action_opp)
             self.optimize(self.batch_size)
@@ -204,11 +205,12 @@ class SAC(Agent):
         # Stack actions for hockey env
         action = np.hstack([action, action_opp]) if self.hockey else action
         next_state, reward, terminated, truncated, _ = self.env.step(action)
+        opp_next_state = self.env.obs_agent_two() if self.hockey else None
         reward = torch.tensor([reward], device=self.device)
         done = terminated or truncated
         if terminated:
             next_state = np.zeros(self.num_states)
-        self.record(state, action, next_state, reward, done)
+        self.record(state, action, next_state, opp_next_state, reward, done)
         return next_state, done
 
     def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict]:
@@ -221,12 +223,14 @@ class SAC(Agent):
                 frame = self.env.render(**render_kwargs)
                 if frame is not None:
                     frames.append(Image.fromarray(frame))
+            opp_state = self.env.obs_agent_two() if self.hockey else None
+            action_opp = self.opponent.act(opp_state) if self.hockey else None
             action = self.select_action(state, deterministic=True, action_space=self.agent_action_space)
-            action_opp = self.opponent.act(state) if self.hockey else None
             action = np.hstack([action, action_opp]) if self.hockey else action
             next_state, reward, terminated, truncated, info = self.env.step(action)
+            opp_next_state = self.env.obs_agent_two() if self.hockey else None
             done = terminated or truncated
-            self.record(state.tolist(), action, next_state, reward, done)
+            self.record(state.tolist(), action, next_state, opp_next_state, reward, done)
             state = next_state
         return frames, info
 

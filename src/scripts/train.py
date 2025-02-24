@@ -116,7 +116,9 @@ def run_training(cfg: DictConfig):
         agent.train_episode()
 
         loss = agent.losses[-1] if agent.losses else 0
-        writer.add_scalar("Loss", loss, global_step=agent.steps_done)
+        running_avg_rewards = agent.memory.running_avg_rewards if agent.memory.rewards else [0]
+        writer.add_scalar("Loss", running_avg_rewards, global_step=agent.steps_done)
+        writer.add_scalar("Rewards (Running Avg)", running_avg_rewards, global_step=len(agent.memory))
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
 
         if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:

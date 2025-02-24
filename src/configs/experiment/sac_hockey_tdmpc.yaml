@@ -6,7 +6,7 @@ defaults:
   - override /env: hockey-vs-tdmpc
 
 agent:
-  name: sac_hockey_tdmpc
+  name: sac_hockey_bot_play_v0
   hidden_size: 400
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-4
@@ -19,4 +19,4 @@ agent:
     batch_size: 128
     save_agent: True
     save_interval: 10
-    continue_training: False
+    continue_training: True

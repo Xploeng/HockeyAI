@@ -3,10 +3,10 @@
 defaults:
   - override /env: hockey-vs-sac
 
-agent: 'sac_hockey_bot_play_v0'
+agent: 'sac_hockey_tdmpc'
 
-episodes: 10
+episodes: 50
 episode_max_steps: 200
 show_figures: True
 hockey : True
-render: True
+render: False
