@@ -126,14 +126,15 @@ class OpponentWrapper:
             from agents.rainbow import Rainbow
             from agents.sac import SAC
             from agents.tdmpc import TDMPC
-            
+            from agents.tdmpc_bcl import TDMPC_BCL
+
             if isinstance(self.opponent, Rainbow):
                 if not isinstance(state, torch.Tensor):
                     state = torch.tensor(state, dtype=torch.float32, device=self.opponent.device)
                 action = self.opponent.select_action(state)
                 action = [self.env.discrete_to_continous_action(a.item()) for a in action]
                 action = torch.tensor(action, dtype=torch.float32, device=self.opponent.device).squeeze()
-            elif isinstance(self.opponent, (DDPG, SAC, TDMPC)):
+            elif isinstance(self.opponent, (DDPG, SAC, TDMPC, TDMPC_BCL)):
                 action = self.opponent.select_action(state)
 
         return action

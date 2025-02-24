@@ -3,10 +3,10 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: tdmpc_bcl
-  - override /env: hockey-vs-sac
+  - override /env: hockey-vs-basic
 
 agent:
-  name: tdmpc_hockey_sac_play
+  name: tdmpc_bcl_hockey_tdmpc_play
   hidden_size: 256
   latent_dim: 50
   horizon: 5
@@ -25,5 +25,5 @@ agent:
     actor_lr: 1e-4
     value_lr: 1e-3
     save_agent: True
-    save_interval: 10
-    continue_training: False
+    save_interval: 100
+    continue_training: True

@@ -92,22 +92,20 @@ class RainbowHockeyAgent(Agent):
             device=self.device,
             recursive=False,
         )
-        
+        cfg.agent.training.continue_training = True
         # Load the checkpoint
         checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/rainbow_hockey_bot_composite_last.ckpt"
         if os.path.exists(checkpoint_path):
-            load_checkpoint(cfg, self.rainbow, checkpoint_path, self.device)
-            print(f"Loaded checkpoint from {checkpoint_path}")
+            eps = load_checkpoint(cfg, self.rainbow, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path} eps: {eps}")
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
     def get_step(self, observation: list[float]) -> list[float]:
         state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         action = self.rainbow.select_action(state)
-        print(action)
-        continuous_action = self.env.discrete_to_continous_action(action.item())
-        print(continuous_action)
-        return continuous_action
+        action = [self.env.env.discrete_to_continous_action(a.item()) for a in action]
+        return action[0]
 
     def on_start_game(self, game_id) -> None:
         game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
@@ -206,8 +204,8 @@ class TDMPCHockeyAgent(Agent):
         checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_hockey_sac_play/checkpoints/tdmpc_hockey_sac_play_last.ckpt"
         cfg.agent.training.continue_training = True
         if os.path.exists(checkpoint_path):
-            load_checkpoint(cfg, self.tdmpc, checkpoint_path, self.device)
-            print(f"Loaded checkpoint from {checkpoint_path}")
+            eps = load_checkpoint(cfg, self.tdmpc, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path} eps: {eps}")
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
@@ -265,21 +263,8 @@ class TDMPCBCLHockeyAgent(Agent):
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
-    def _is_player_two(self, observation: list[float]) -> bool:
-        """Detect if we're player 2 based on initial position"""
-        # Player 2 starts on the right side (positive x)
-        return observation[0] > 0  # x position of our player
-
-
-    def get_step(self, observation: list[float]) -> list[float]:
-        # Detect which side we're playing on
-        is_player_two = self._is_player_two(observation)
-        
-        # Mirror the state if we're player 2
-        if is_player_two:
-            state = self.env.obs_agent_two()
-        else:
-            state = torch.tensor(observation, dtype=torch.float32, device=self.device)
+    def get_step(self, observation: list[float]) -> list[float]:        
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device)
         
         # Get action from model
         action = self.tdmpc_bcl.select_action(state, evaluate=True)

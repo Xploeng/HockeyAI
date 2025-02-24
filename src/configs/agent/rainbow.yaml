@@ -4,7 +4,7 @@ defaults:
   - network: noisy_cat_duel
   - training: default
 
-bins: 100
+bins: 7
 
 mode: train # train/test or opponent
 

@@ -194,11 +194,17 @@ class TDMPC_BCL(Agent):
         return total_value
 
     def record(self, state, action, next_state, reward, done):
-        """Record transition in replay memory"""
-        assert len(action) == self.action_dim, f"Action dim mismatch: expected {self.action_dim}, got {len(action)}"
+        """Record transition in replay memory, including opponent action if available"""
         assert len(state) == self.num_states, f"State dim mismatch: expected {self.num_states}, got {len(state)}"
         assert len(next_state) == self.num_states, f"Next state dim mismatch: expected {self.num_states}, got {len(next_state)}"
-        self.memory.push(state, action, next_state, reward, done)
+        
+        # For hockey environment, action contains both agent and opponent actions
+        if self.hockey and len(action) == self.num_actions:
+            agent_action = action[:self.action_dim]
+            opp_action = action[self.action_dim:]
+            self.memory.push(state, (agent_action, opp_action), next_state, reward, done)
+        else:
+            self.memory.push(state, action, next_state, reward, done)
 
     def optimize(self, batch_size):
         """Optimize world model, actor, and value function with behavioral cloning"""
@@ -209,16 +215,25 @@ class TDMPC_BCL(Agent):
         batch = Transition(*zip(*transitions))
 
         states = torch.FloatTensor(np.array(batch.state)).to(self.device)
-        actions = torch.FloatTensor(np.array(batch.action)).to(self.device)
         next_states = torch.FloatTensor(np.array(batch.next_state)).to(self.device)
         rewards = torch.FloatTensor(batch.reward).to(self.device).unsqueeze(1)
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
 
+        # Handle actions differently for hockey environment
         if self.hockey:
-            actions = actions[:, :self.action_dim]
+            # Unpack agent and opponent actions
+            agent_actions, opp_actions = zip(*batch.action)
+            actions = torch.FloatTensor(np.array(agent_actions)).to(self.device)
+            opp_actions = torch.FloatTensor(np.array(opp_actions)).to(self.device)
+            
+            # Concatenate actions for world model prediction
+            combined_actions = torch.cat([actions, opp_actions], dim=1)
+            pred_next_states = self.world_model.predict_next_state(states, combined_actions)
+        else:
+            actions = torch.FloatTensor(np.array(batch.action)).to(self.device)
+            pred_next_states = self.world_model.predict_next_state(states, actions)
 
         # Update World Model
-        pred_next_states = self.world_model.predict_next_state(states, actions)
         pred_rewards = self.world_model.predict_reward(states, actions, next_states)
         state_loss = torch.nn.functional.mse_loss(pred_next_states, next_states)
         reward_loss = torch.nn.functional.mse_loss(pred_rewards, rewards)
@@ -291,7 +306,8 @@ class TDMPC_BCL(Agent):
         if terminated:
             next_state = np.zeros(self.num_states)
 
-        memory_action = action
+        # Store both agent and opponent actions when in hockey environment
+        memory_action = full_action if self.hockey else action
         self.record(state, memory_action, next_state, self.last_reward, done)
         return next_state, done
 
