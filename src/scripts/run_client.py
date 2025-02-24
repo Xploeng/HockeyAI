@@ -124,7 +124,6 @@ class SACHockeyAgent(Agent):
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg = hydra.compose(config_name=config_path)
 
-        print(cfg)
         # Initialize environment
         self.env = h_env.HockeyEnv()
 
@@ -149,21 +148,8 @@ class SACHockeyAgent(Agent):
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
-    def _is_player_two(self, observation: list[float]) -> bool:
-        """Detect if we're player 2 based on initial position"""
-        # Player 2 starts on the right side (positive x)
-        return observation[0] > 0  # x position of our player
-
     def get_step(self, observation: list[float]) -> list[float]:
-        # Detect which side we're playing on
-        is_player_two = self._is_player_two(observation)
-
-        # Mirror the state if we're player 2
-        if is_player_two:
-            state = self.env.obs_agent_two()
-        else:
-            state = torch.tensor(observation, dtype=torch.float32, device=self.device)
-
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device)
         action = self.sac.select_action(state, deterministic=True)
         return action.tolist()
 
