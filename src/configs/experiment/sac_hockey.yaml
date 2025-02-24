@@ -16,7 +16,7 @@ agent:
 
   training:
     episodes: 2001
-    batch_size: 64
+    batch_size: 256
     save_agent: True
     save_interval: 10
     continue_training: True

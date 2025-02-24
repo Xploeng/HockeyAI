@@ -113,11 +113,12 @@ def run_training(cfg: DictConfig):
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
 
-        agent.train_episode()
-
-        loss = agent.losses[-1] if agent.losses else 0
+        critic_losses, actor_losses, alpha_losses = agent.train_episode()
         running_avg_rewards = agent.memory.running_avg_rewards if agent.memory.rewards else [0]
-        writer.add_scalar("Loss", running_avg_rewards, global_step=agent.steps_done)
+        for crl, acl, alphal in zip(critic_losses, actor_losses, alpha_losses):
+            writer.add_scalar("Loss/critic", crl, global_step=agent.steps_done)
+            writer.add_scalar("Loss/actor", acl, global_step=agent.steps_done)
+            writer.add_scalar("Loss/alpha", alphal, global_step=agent.steps_done)
         writer.add_scalar("Rewards (Running Avg)", running_avg_rewards, global_step=len(agent.memory))
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
 

@@ -3,9 +3,9 @@
 defaults:
   - override /env: hockey-vs-basic
 
-agent: 'sac_hockey_tdmpc'
+agent: 'sac_hockey'
 
-episodes: 10
+episodes: 50
 episode_max_steps: 200
 show_figures: True
 hockey : True

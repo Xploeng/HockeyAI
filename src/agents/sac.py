@@ -92,6 +92,8 @@ class SAC(Agent):
         else:
             self.target_entropy = -self.num_actions
 
+        self.steps_done = 0
+
     def select_action(self, state, deterministic=False, action_space=None):
         """Select an action using the actor network."""
         # During evaluation, we typically use deterministic actions.
@@ -174,6 +176,8 @@ class SAC(Agent):
         # --- Soft Update Target Critic ---
         self._soft_update(self.critic_target, self.critic, self.tau)
 
+        return critic_loss.item(), actor_loss.item(), alpha_loss.item()
+
     def _soft_update(self, target, source, tau):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
@@ -189,7 +193,7 @@ class SAC(Agent):
     def train_episode(self) -> None:
         state, _ = self.env.reset()
         done = False
-        step_idx = 0
+        critic_losses, actor_losses, alpha_losses = [], [], []
         while not done:
             action = self.select_action(state)
             # When interacting with the environment, the opponent acts as before
@@ -197,9 +201,15 @@ class SAC(Agent):
             action_opp = self.opponent.act(opp_state) if self.hockey else None
             action_opp = action_opp.cpu().numpy() if isinstance(action_opp, torch.Tensor) else action_opp
             next_state, done = self.step(state, action, action_opp)
-            self.optimize(self.batch_size)
+            losses = self.optimize(self.batch_size)
+            if losses is not None:
+                critic_loss, actor_loss, alpha_loss = losses
+                critic_losses.append(critic_loss)
+                actor_losses.append(actor_loss)
+                alpha_losses.append(alpha_loss)
             state = next_state
-            step_idx += 1
+            self.steps_done += 1
+        return critic_losses, actor_losses, alpha_losses
 
     def step(self, state, action, action_opp=None):
         # Stack actions for hockey env

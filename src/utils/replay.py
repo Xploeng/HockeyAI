@@ -45,7 +45,10 @@ class ReplayMemory:
     @property
     def rewards(self) -> list[float]:
         # print(self.ptr)
-        return [transition.reward.detach().cpu().item() for transition in self.memory[: self.ptr]]
+        return [transition.reward.detach().cpu().item()
+                if isinstance(transition.reward, torch.Tensor)
+                else transition.reward
+                for transition in self.memory[: self.ptr]]
 
     @property
     def running_avg_rewards(self, window=100):
