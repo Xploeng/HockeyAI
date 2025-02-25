@@ -3,18 +3,27 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow-naf
-  - override /env: hockey-vs-rain
+  - override /env: hockey
 
 agent:
-  name: rainbow_hockey_naf_vs_composite
+  name: rainbow_naf
   requires_continues_action_space: True
 
   network:
-    hidden_size: 256
+    hidden_size: 128
 
   training:
     composite_loss: True
-    episodes: 2000
+    criterion: 
+      reduction: 'none'
+    episodes: 1000
     batch_size: 128
     save_agent: True
     continue_training: False
+
+  memory:
+    n_steps: 1
+
+env:
+  opponent:
+    weak: False

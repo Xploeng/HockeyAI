@@ -1,0 +1,21 @@
+defaults: 
+  - memory: prioritized_buffer
+  - memory@n_memory: n_step_buffer
+  - network: noisy_cat_duel
+  - training: default
+
+bins: 7
+
+mode: train # train/test or opponent
+
+# type: DQL Agent
+_target_: agents.Rainbow
+_recursive_: False
+name: Rainbow
+requires_continues_action_space: False
+
+training:
+  binned: True
+  composite_loss: True
+  criterion:
+    reduction: none

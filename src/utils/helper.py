@@ -124,3 +124,55 @@ class OpponentWrapper:
             else:
                 action = action.squeeze().cpu().numpy()
         return action
+    
+def discrete_to_continuous_action(discrete_action, bins, keep_mode=False):
+    """Converts a discrete action index into a smooth continuous action vector.
+    
+    If `keep_mode` is True, an additional binary shooting action is included.
+
+    Args:
+        discrete_action (int): The index of the discrete action.
+        bins (int): Number of bins per action dimension.
+        keep_mode (bool): Whether to include a 4th dimension for shooting.
+
+    Returns:
+        list: A list of 3 (or 4 if `keep_mode=True`) continuous values in range [-1, 1], with the last being binary (0 or 1).
+    
+    Raises:
+        ValueError: If discrete_action is out of range.
+    """
+    if bins < 1:
+        raise ValueError("Bins must be at least 1.")
+
+    # Adjust bin size if keep_mode is enabled (adds an extra binary dimension)
+    if keep_mode:
+        total_bins = bins ** 3 * 2  # Extra factor of 2 for the shooting action
+    else:
+        total_bins = bins ** 3
+
+    if not (0 <= discrete_action < total_bins):
+        raise ValueError(f"Discrete action {discrete_action} is out of bounds for bins {bins}")
+
+    # Decode the discrete action into bins
+    x_bin = (discrete_action // (bins * bins)) % bins
+    y_bin = (discrete_action // bins) % bins
+    angle_bin = discrete_action % bins
+
+    # Midpoint scaling for smoother transitions
+    if bins > 1:
+        action_cont = [
+            (x_bin + 0.5) / bins * 2 - 1,
+            (y_bin + 0.5) / bins * 2 - 1,
+            (angle_bin + 0.5) / bins * 2 - 1
+        ]
+    else:
+        action_cont = [0.0, 0.0, 0.0]
+
+    # If keep_mode is enabled, extract the shooting action
+    if keep_mode:
+        shoot_bin = (discrete_action // (bins ** 3)) % 2  # Binary (0 or 1)
+        action_cont.append(float(shoot_bin))  # Add shooting action as continuous value
+
+    return action_cont
+
+

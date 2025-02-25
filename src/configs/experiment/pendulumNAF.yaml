@@ -3,10 +3,11 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow-naf
-  - override /env: hockey-vs-naf
+  - override /env: pendulum
+  - override /agent/network: NAF
 
 agent:
-  name: rainbow_hockey_naf_selfplay
+  name: pendulum_naf_n_step
   requires_continues_action_space: True
 
   network:
@@ -14,7 +15,15 @@ agent:
 
   training:
     composite_loss: True
-    episodes: 2000
+    criterion: 
+      reduction: 'mean'
+    episodes: 200
     batch_size: 128
     save_agent: True
     continue_training: False
+
+  memory:
+    n_steps: 3
+    capacity: 100000
+  n_memory:
+    capacity: 100000

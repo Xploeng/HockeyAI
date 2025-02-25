@@ -3,10 +3,14 @@
 defaults:
   - override /env: hockey
 
-agent: 'rainbow_hockey_naf'
+agent: 'rainbow_naf'
 
-episodes: 500
+episodes: 300
 episode_max_steps: 400
-show_figures: False
+show_figures: True
 hockey : True
 render: False
+
+env:
+  opponent:
+    weak: True

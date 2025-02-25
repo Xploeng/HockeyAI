@@ -12,6 +12,7 @@ from .agent import Agent
 
 sys.path.append("src/")
 from utils.replay import Transition
+from utils.helper import discrete_to_continuous_action
 
 
 class Rainbow(Agent):
@@ -24,7 +25,7 @@ class Rainbow(Agent):
         training,
         n_memory=None,
         device=torch.device("cuda:0"),
-        bins=100,
+        bins=5,
         mode='train',
         **_,
     ):
@@ -36,16 +37,21 @@ class Rainbow(Agent):
         self.training = training
         self.mode = mode
         self.composite_loss = training.composite_loss
+        self.binned = training.binned
+        self.bins = bins
 
         if opponent is not None or self.mode == 'opponent':
             self.hockey = True
-            bins = 7
         else:
             self.hockey = False
 
-        self.n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else bins
+        if self.binned:
+            n_actions = self.bins ** 3 * 2 
+        else:
+            n_actions = 7
+        self.n_actions = env.action_space.n if isinstance(env.action_space, spaces.Discrete) else n_actions
         n_observations = env.observation_space.shape[0]
-
+        
         # Categorical DQN
         self.v_min = network.v_min
         self.v_max = network.v_max
@@ -128,7 +134,10 @@ class Rainbow(Agent):
 
     def step(self, state, action, action_opp=None):
         if self.hockey:
-            act = self.env.discrete_to_continous_action(action.item())
+            if self.binned:
+                act =  discrete_to_continuous_action(action.item(), self.bins, True)
+            else:
+                act = self.env.discrete_to_continous_action(action.item())
             act = np.hstack([act, action_opp])
         else:
             act = action.item()

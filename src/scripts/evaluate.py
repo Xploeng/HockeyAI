@@ -119,7 +119,7 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     all_episode_stats = {}
     print(f"\nEvaluating the model on {cfg.episodes} episodes.")
     if cfg.hockey:
-        op_name = agent_cfg.env.opponent.name if cfg.env.opponent_type == "AgentOpponent" else "BasicOpponent"
+        op_name = agent_cfg.env.opponent.name if cfg.env.opponent_type == "AgentOpponent" else f"BasicOpponent_{"weak" if cfg.env.opponent.weak else "strong"}"
         print("Hockey mode enabled.")
         print(f"Evaluating {cfg.agent} against {op_name}.")
     for episode in tqdm(range(cfg.episodes)):
@@ -148,7 +148,7 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     print(f"Episode statistics saved to {stats_file_path}")
 
     # Plot the results as a pie chart
-    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.show_figures)
+    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.show_figures, name=op_name)
 
 @hydra.main(config_path="../configs/", config_name="config_eval", version_base=None)
 def run_evaluations(cfg: DictConfig) -> None:
