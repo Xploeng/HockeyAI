@@ -3,10 +3,10 @@
 defaults:
   - override /env: hockey-vs-basic
 
-agent: 'tdmpc_bcl_hockey_tdmpc_play'
+agent: 'tdmpc_bcl_weak_v0'
 
-episodes: 15
-episode_max_steps: 200
+episodes: 250
+episode_max_steps: 500
 show_figures: True
 hockey : True
-render: True
+render: False

@@ -241,28 +241,33 @@ def plot_q_function_all_dims(agent: Any, env_name: str, out_dir: str) -> None:
 def plot_wins_vs_losses(wins, draws, losses, save_path, show=True):
     labels = "Wins", "Draws", "Losses"
     sizes = [wins, draws, losses]
-    colors = ["#ff9999", "#66b3ff", "#99ff99"]
-    explode = (0.1, 0, 0)  # explode the 1st slice (Wins)
+    colors = ["#66cc66", "#66b3ff", "#ff6666"]  # Green for wins, blue for draws, red for losses
+    explode = (0.05, 0, 0)  # explode the 1st slice (Wins)
 
-    fig1, ax1 = plt.subplots()
-    wedges, texts, autotexts = ax1.pie(
+    plt.figure(figsize=(10, 8), facecolor='white')  # Changed from '#f9f9f9' to 'white'
+    wedges, texts, autotexts = plt.pie(
         sizes,
         explode=explode,
         labels=labels,
         colors=colors,
-        autopct="%1.1f%%",
-        shadow=True,
+        autopct='%1.1f%%',
+        shadow=False,
         startangle=90,
+        textprops={'fontsize': 14, 'fontweight': 'bold'},
+        wedgeprops={'edgecolor': 'grey', 'linewidth': 2}
     )
-    ax1.axis("equal")  # Equal aspect ratio ensures that pie is drawn as a circle.
+    plt.axis("equal")  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    # Add percentage values
+    # Add percentage values with improved styling
     for autotext in autotexts:
         autotext.set_color("white")
-        autotext.set_fontsize(12)
-
+        autotext.set_fontsize(18)
+        autotext.set_fontweight('bold')
+        
+    plt.tight_layout()
+    
     pie_chart_path = os.path.join(save_path, "winrate.png")
-    fig1.savefig(pie_chart_path)
+    plt.savefig(pie_chart_path, bbox_inches="tight", dpi=300, facecolor='white')  # Added facecolor='white' here
     print(f"Evaluation pie chart saved to {pie_chart_path}")
     if show:
         plt.show()
