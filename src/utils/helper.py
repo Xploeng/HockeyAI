@@ -104,10 +104,11 @@ class DiscreteActionWrapper(gym.ActionWrapper):
         )
         
 class OpponentWrapper:
-    def __init__(self, opponent, env, requires_continues_action_space):
+    def __init__(self, opponent, env, requires_continues_action_space, device):
         self.env = env
         self.opponent = opponent
         self.requires_continues_action_space = requires_continues_action_space
+        self.device = device
         
         self.opp_type = 'agent' if isinstance(opponent, Agent) else 'basic'
         
@@ -116,6 +117,7 @@ class OpponentWrapper:
         if self.opp_type == 'basic':
             action = self.opponent.act(state)
         elif self.opp_type == 'agent':
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             action = self.opponent.select_action(state)
             if not self.requires_continues_action_space:
                 action = self.env.discrete_to_continous_action(action.item())

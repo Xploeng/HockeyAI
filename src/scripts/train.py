@@ -36,9 +36,9 @@ def initialize_opponent(cfg: DictConfig, env, device: torch.device):
         opp_cfg.agent.mode = 'opponent'
         
         opp, _ = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
-        return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space)
+        return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space, device)
     elif cfg.env.opponent_type == "BasicOpponent":
-        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env, False)
+        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env, False, device)
 
 def initialize_environment(cfg: DictConfig):
     if cfg.env.name == "Hockey-v0":
@@ -105,14 +105,13 @@ def run_training(cfg: DictConfig):
 
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
-        episode += start_episode
-
+        
         agent.train_episode()
 
         loss = agent.losses[-1] if agent.losses else 0
         writer.add_scalar("Loss", loss, global_step=agent.steps_done)
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
-        writer.add_scalar("Reward", agent.reward, global_step=episode)
+        writer.add_scalar("Reward", agent.reward, global_step=agent.steps_done)
 
         if cfg.agent.training.save_agent and episode % cfg.agent.training.save_interval == 0:
             save_checkpoint(agent, get_checkpoint_path(cfg.agent.name), episode)
