@@ -51,6 +51,7 @@ class SAC(Agent):
         self.memory = ReplayMemory(self.memory_cfg.capacity)
 
         self.hockey = True if opponent is not None or self.mode == "opponent" else False
+        print(f"Using hockey environment: {self.hockey}")
         self.num_states = env.observation_space.shape[0]
         self.num_actions = env.action_space.shape[0]
 
@@ -258,6 +259,12 @@ class SAC(Agent):
         self.actor_optimizer.load_state_dict(agent_state_dict["actor_optimizer_state_dict"])
         self.critic_optimizer.load_state_dict(agent_state_dict["critic_optimizer_state_dict"])
         self.alpha_optimizer.load_state_dict(agent_state_dict["alpha_optimizer_state_dict"])
+        try:
+            self.log_alpha = agent_state_dict["log_alpha"]
+            self.memory = agent_state_dict["memory"]
+            self.steps_done = agent_state_dict["steps_done"]
+        except KeyError:
+            pass
 
     def state_dict(self):
         """Return the agent's state as a dictionary for checkpoint saving."""
@@ -269,5 +276,8 @@ class SAC(Agent):
                 "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
                 "critic_optimizer_state_dict": self.critic_optimizer.state_dict(),
                 "alpha_optimizer_state_dict": self.alpha_optimizer.state_dict(),
+                "log_alpha": self.log_alpha,
+                "memory": self.memory,
+                "steps_done": self.steps_done,
             },
         )

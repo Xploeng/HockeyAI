@@ -27,7 +27,7 @@ def plot_rewards_from_memory(checkpoint, output_dir=None, window_size=10):
     
     os.makedirs(output_dir, exist_ok=True)
     
-    checkpoint = torch.load(checkpoint, map_location='cpu')
+    checkpoint = torch.load(checkpoint, map_location='cpu', weights_only=False)
     
     # Extract memory from the agent state dict
     agent_state_dict = checkpoint['agent_state_dict']
@@ -168,4 +168,6 @@ if __name__ == "__main__":
     parser.add_argument("--window_size", type=int, default=100, help="Window size for smoothing")
     
     args = parser.parse_args()
-    plot_rewards_from_memory("/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_bcl_weak_v0/checkpoints/tdmpc_bcl_weak_v0_last.ckpt", "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_bcl_weak_v0/episode_statistics", args.window_size)
+    path1 = "/home/tluebbing/workspace/studies/HockeyAI/src/outputs/sac_hockey_weak/checkpoints/sac_hockey_weak_last.ckpt"
+    path2 = "/home/tluebbing/workspace/studies/HockeyAI/src/outputs/sac_hockey_weak/episdoe_statistics"
+    plot_rewards_from_memory(path1, path2, args.window_size)
