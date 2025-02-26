@@ -44,23 +44,14 @@ class PinkNoise:
     def select_action(self, action):
         """
         Add pink noise to the action.
-
-        # ? Macht fft überhaupt sinn wenn der action_space nur 1D ist?
-        # ? fft von einer Zahl ist genau die selbe Zahl (nur mit 0 als Imaginärteil)
-        # ? Heißt im pendulum env macht es keinen Sinn, aber in anderen envs schon?
-        # ? Oder bin ich komplett lost gerade?
         """
         white_noise = np.random.randn(self.action_dim)
-        # print(white_noise)
         fft = np.fft.rfft(white_noise)
-        # print(fft)
         freqs = np.arange(1, len(white_noise) + 1)
-        # print(freqs)
         fft_filtered = fft / freqs ** self.beta
-        # print(fft_filtered)
         pink_noise = np.fft.irfft(fft_filtered, n=len(white_noise))
         # pink_noise = np.fft.irfft(np.fft.rfft(white_noise) / np.arange(1, len(white_noise) + 1) ** self.beta)
-        pink_noise = pink_noise[: self.action_dim]  # Ensure the noise has the correct dimension
+        pink_noise = pink_noise[: self.action_dim]
         self.noise = self.scale * pink_noise
         return np.clip(action + self.noise, self.low, self.high)
 

@@ -67,7 +67,6 @@ class SAC(Agent):
             self.critic = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
             self.critic_optimizer = optim.AdamW(self.critic.parameters(), lr=critic_learning_rate)
 
-            # Target critic
             self.critic_target = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
             self.critic_target.load_state_dict(self.critic.state_dict())
         else:
@@ -81,12 +80,12 @@ class SAC(Agent):
             self.critic_target = SACCritic(self.num_states, self.num_actions, hidden_size).to(self.device)
             self.critic_target.load_state_dict(self.critic.state_dict())
 
-        # Temperature parameter for entropy regularization
+        # temperature parameter for entropy regularization
         self.log_alpha = torch.tensor(np.log(self.alpha)).to(self.device)
         self.log_alpha.requires_grad = True
         self.alpha_optimizer = optim.AdamW([self.log_alpha], lr=actor_learning_rate)
 
-        # Set target entropy (e.g. -dim(action))
+        # target entropy (-dim(action))
         if self.hockey:
             self.target_entropy = -out_actions
         else:
@@ -96,7 +95,7 @@ class SAC(Agent):
 
     def select_action(self, state, deterministic=False, action_space=None):
         """Select an action using the actor network."""
-        # During evaluation, we typically use deterministic actions.
+        # during evaluation, use deterministic actions!
         action = self.actor.select_action(state, deterministic)
         if action_space is not None:
             return np.clip(action, action_space.low, action_space.high)
@@ -107,6 +106,7 @@ class SAC(Agent):
         self.memory.push(state, action, next_state, opp_next_state, reward, done)
 
     def optimize(self, batch_size):
+        """Optimize the actor and critic networks using the sampled batch."""
         if len(self.memory) < batch_size:
             return
         try:
@@ -123,7 +123,7 @@ class SAC(Agent):
         opp_next_states = torch.FloatTensor(np.array(batch.opp_next_state)).to(self.device) if self.hockey else None
         dones = torch.FloatTensor(np.array(batch.done)).to(self.device).unsqueeze(1)
 
-        # --- Critic Update ---
+        # Critic Update
         with torch.no_grad():
             # Sample next action from actor (and compute log_prob)
             next_agent_action, next_log_prob, _ = self.actor.sample(next_states)
@@ -131,17 +131,18 @@ class SAC(Agent):
                 # Get opponent actions for next states
                 if self.opponent.opp_type == "basic":
                     next_opponent_actions = self._batch_opponent_actions(opp_next_states)
-                else: # only sac opponent is supported atm
+                else:
                     next_opponent_actions = self.opponent.act(next_states.unsqueeze(0))
                     next_opponent_actions = torch.tensor(opp_next_states).to(self.device).squeeze(0)
                 next_joint_action = torch.cat([next_agent_action, next_opponent_actions], dim=1)
             else:
                 next_joint_action = next_agent_action
 
-            # Compute target Q using target critic (twin Q: take min)
+            # Compute target Q using target critic
+            # min of both target Q networks
+            # target modulated by entropy regularization
             target_q1, target_q2 = self.critic_target(next_states, next_joint_action)
             target_q = torch.min(target_q1, target_q2)
-            # Target value incorporates entropy term
             target_value = rewards + self.gamma * (target_q - torch.exp(self.log_alpha) * next_log_prob) * (1 - dones)
 
         current_q1, current_q2 = self.critic(states, actions)
@@ -150,7 +151,7 @@ class SAC(Agent):
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        # --- Actor Update ---
+        # Actor Update
         agent_action, log_prob, _ = self.actor.sample(states)
         if self.hockey:
             if self.opponent.opp_type == "basic":
@@ -167,22 +168,24 @@ class SAC(Agent):
         actor_loss.backward()
         self.actor_optimizer.step()
 
-        # --- Temperature (alpha) Update ---
+        # Temperature (alpha) Update
         alpha_loss = -(self.log_alpha * (log_prob + self.target_entropy).detach()).mean()
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
-        # --- Soft Update Target Critic ---
+        # Soft Update Target Critic
         self._soft_update(self.critic_target, self.critic, self.tau)
 
         return critic_loss.item(), actor_loss.item(), alpha_loss.item()
 
     def _soft_update(self, target, source, tau):
+        """Soft update model parameters."""
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
 
     def _batch_opponent_actions(self, states):
+        """Batch opponent actions for hockey env."""
         actions = []
         # Process each state sequentially (or parallelize if opponent.act supports batching)
         for state in states:
@@ -191,6 +194,7 @@ class SAC(Agent):
         return torch.FloatTensor(np.array(actions)).to(states.device)
 
     def train_episode(self) -> None:
+        """Train the agent for a single episode."""
         state, _ = self.env.reset()
         done = False
         critic_losses, actor_losses, alpha_losses = [], [], []
@@ -212,6 +216,7 @@ class SAC(Agent):
         return critic_losses, actor_losses, alpha_losses
 
     def step(self, state, action, action_opp=None):
+        """Take a step in the environment using the generated action."""
         # Stack actions for hockey env
         action = np.hstack([action, action_opp]) if self.hockey else action
         next_state, reward, terminated, truncated, _ = self.env.step(action)
@@ -224,6 +229,7 @@ class SAC(Agent):
         return next_state, done
 
     def evaluate_episode(self, render: bool = True) -> tuple[list[Image.Image], dict]:
+        """Evaluate the agent for a single episode. Deterministic actions are used."""
         state, info = self.env.reset()
         done = False
         frames = []
@@ -245,6 +251,7 @@ class SAC(Agent):
         return frames, info
 
     def load_state_dict(self, agent_state_dict, episode=None, **_):
+        """Load the agent's state from a checkpoint to allow for continuos training."""
         self.actor.load_state_dict(agent_state_dict["actor_state_dict"])
         self.critic.load_state_dict(agent_state_dict["critic_state_dict"])
         self.critic_target.load_state_dict(agent_state_dict["critic_target_state_dict"])
@@ -253,6 +260,7 @@ class SAC(Agent):
         self.alpha_optimizer.load_state_dict(agent_state_dict["alpha_optimizer_state_dict"])
 
     def state_dict(self):
+        """Return the agent's state as a dictionary for checkpoint saving."""
         return collections.OrderedDict(
             {
                 "actor_state_dict": self.actor.state_dict(),
