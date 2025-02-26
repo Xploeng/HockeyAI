@@ -241,13 +241,19 @@ class NAF(torch.nn.Module):
         self.in_dim = n_observations
         self.out_dim = n_actions
         # common feature layer
-        self.feature_layer = torch.nn.Sequential(
+        self.f1 = torch.nn.Sequential(
             torch.nn.Linear(self.in_dim, hidden_size),
             torch.nn.ReLU(),
             torch.nn.BatchNorm1d(hidden_size),
-            torch.nn.Linear(hidden_size, hidden_size),
+        )
+        self.f2 = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size + self.in_dim, hidden_size),
             torch.nn.ReLU(),
             torch.nn.BatchNorm1d(hidden_size),
+        )
+        self.f3 = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size + self.in_dim, hidden_size),
+            torch.nn.ReLU(),
         )
 
         # value layer
@@ -255,10 +261,7 @@ class NAF(torch.nn.Module):
         
 
         # advantage layer
-        self.mu = torch.nn.Sequential(
-            torch.nn.Linear(hidden_size, self.out_dim),
-            torch.nn.Tanh(),
-        )
+        self.mu = torch.nn.Linear(hidden_size, n_actions)
         
         # Cholesky factor
         self.matrix_entries = nn.Linear(hidden_size, int(self.out_dim * (self.out_dim + 1) / 2))
@@ -266,8 +269,9 @@ class NAF(torch.nn.Module):
     def forward(self, state: torch.Tensor, action = None) -> torch.Tensor:
         assert state.dtype == torch.float32, f"Input must be a float tensor but got {state.dtype}"
                 
-        x = self.feature_layer(state)
-        
+        x = self.f1(state)
+        x = self.f2(torch.cat([x, state], dim=1))
+        x = self.f3(torch.cat([x, state], dim=1)) 
         
         value = self.value_layer(x)
         mu = torch.tanh(self.mu(x))
