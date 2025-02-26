@@ -1,12 +1,14 @@
 import os
 import sys
+
+from pathlib import Path
 import gymnasium as gym
-import yaml
 import hockey
 import hydra
 import numpy as np
 import torch
 import torch.utils.tensorboard as tb
+import yaml
 
 from gymnasium import spaces
 from omegaconf import DictConfig
@@ -16,6 +18,7 @@ from tqdm import tqdm
 sys.path.append("src/")
 from agents import Agent
 from utils.helper import DiscreteActionWrapper, OpponentWrapper, load_checkpoint, save_checkpoint
+
 
 def get_checkpoint_path(agent_name):
     return os.path.join(
@@ -27,18 +30,21 @@ def get_checkpoint_path(agent_name):
 
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
-        opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
-        with open(opp_cfg_pth, 'r') as file:
+        # opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
+        opp_cfg_pth = Path(".") / "src" / "outputs" / cfg.env.opponent.name / ".hydra" / "config.yaml"
+        with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
-        
+
         # enable checkpoint loading
         opp_cfg.agent.training.continue_training = True
         opp_cfg.agent.mode = 'opponent'
-        
+
         opp, _ = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
         return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space, device)
     elif cfg.env.opponent_type == "BasicOpponent":
-        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env, False, device)
+        return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env)
+    else:
+        raise ValueError(f"Unknown opponent type: {cfg.env.opponent_type}")
 
 def initialize_environment(cfg: DictConfig):
     if cfg.env.name == "Hockey-v0":
@@ -72,6 +78,7 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     )
 
     start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
+    print(f"Loaded checkpoint for agent {agent.__class__.__name__} from episode {start_episode}.")
 
     return agent, start_episode
 
@@ -105,7 +112,7 @@ def run_training(cfg: DictConfig):
 
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
-        
+
         agent.train_episode()
 
         loss = agent.losses[-1] if agent.losses else 0

@@ -1,6 +1,6 @@
 # latex stuff
 *.pdf
-
+src/.DS_STORE
 # ignore outputs
 src/outputs/*
 

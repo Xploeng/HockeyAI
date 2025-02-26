@@ -1,0 +1,24 @@
+defaults:
+  - _self_
+  - agent: rainbow  # This will load src/configs/agent/rainbow.yaml
+  - override /agent/memory: prioritized_buffer
+  - override /agent/network: noisy_cat_duel
+  - override /agent/training: default
+
+agent:
+  name: rainbow_hockey_bot_play
+  requires_continues_action_space: False
+  mode: opponent
+
+  network:
+    hidden_size: 256
+    atom_size: 51
+    v_min: 0.0
+    v_max: 200.0
+
+  training:
+    criterion: 
+      reduction: 'none'
+    batch_size: 128
+    save_agent: True
+    continue_training: False 

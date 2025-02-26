@@ -4,11 +4,11 @@ defaults:
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
-device: cuda:0
+device: cpu
 
-agent: 'rainbow_test'
+agent: 'tdmpc_bcl_pendulum'
 
-episodes: 100
+episodes: 5
 episode_max_steps: 200
 show_figures: True
 hockey : False

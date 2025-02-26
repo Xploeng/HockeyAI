@@ -1,0 +1,28 @@
+# @package _global_
+
+defaults:
+  - override /agent: tdmpc_bcl
+  - override /env: pendulum
+
+agent:
+  name: tdmpc_pendulum_v0
+  hidden_size: 256
+  latent_dim: 50
+  horizon: 5
+  n_samples: 512
+  mixture_coef: 0.05
+  temperature: 0.5
+  min_buffer_size: 1000
+  reward_weight: 0.1
+  gamma: 0.99
+  action_dim: 8  # Make sure this matches the hockey environment
+
+  training:
+    episodes: 500
+    batch_size: 128
+    world_model_lr: 1e-3
+    actor_lr: 1e-4
+    value_lr: 1e-3
+    save_agent: True
+    save_interval: 100
+    continue_training: True

@@ -1,0 +1,21 @@
+# @package _global_
+
+# Override entire configuration yaml files
+defaults:
+  - override /agent: ddpg
+  - override /env: hockey-vs-rainbow
+
+agent:
+  name: ddpg_hockey_rainbow_play_v1
+  hidden_size: 400
+  actor_learning_rate: 1e-4
+  critic_learning_rate: 1e-3
+  gamma: 0.99
+  tau: 1e-3
+
+  training:
+    episodes: 1001
+    batch_size: 64
+    save_agent: True
+    save_interval: 50
+    continue_training: True

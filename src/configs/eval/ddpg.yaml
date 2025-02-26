@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - override /env: pendulum
+
+agent: 'pendulum-ddpg'
+
+episodes: 5
+episode_max_steps: 200
+show_figures: True
+hockey : False
+render: True

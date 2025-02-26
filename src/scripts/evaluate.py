@@ -3,16 +3,17 @@ import sys
 
 from dataclasses import asdict
 import gymnasium as gym
-import yaml
 import hockey
 import hydra
 import numpy as np
 import torch
+import yaml
 
 from gymnasium import spaces
+from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from tqdm import tqdm
-from hydra.core.global_hydra import GlobalHydra
+
 
 sys.path.append("src/")
 from agents import Agent
@@ -26,6 +27,7 @@ from utils.visuals import (
     save_json,
 )
 
+
 def get_checkpoint_path(agent_name):
     return os.path.join(
         "src/outputs",
@@ -37,13 +39,13 @@ def get_checkpoint_path(agent_name):
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
         opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
-        with open(opp_cfg_pth, 'r') as file:
+        with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
-        
+
         # enable checkpoint loading
         opp_cfg.agent.training.continue_training = True
         opp_cfg.agent.mode = 'opponent'
-        
+
         opp = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
         return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space, device)
     elif cfg.env.opponent_type == "BasicOpponent":
@@ -79,10 +81,11 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
         device=device,
         recursive=False,
     )
-    
+
     cfg.agent.training.continue_training = True
 
-    _ = load_checkpoint(cfg, agent, checkpoint_path, device)
+    episode = load_checkpoint(cfg, agent, checkpoint_path, device)
+    print(f"Loaded checkpoint from episode {episode}.")
 
     return agent
 
@@ -102,7 +105,7 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     # Initialize the environment and agent
     agent_cfg.env = cfg.env
     env= initialize_environment(agent_cfg)
-    opp = initialize_opponent(agent_cfg, env, device)
+    opp = initialize_opponent(cfg, env, device) if cfg.env.name == "Hockey-v0" else None
     agent = initialize_agent(agent_cfg, env, device, checkpoint_path, opp)
 
     # Fresh recordings (clear training recordings)
@@ -148,7 +151,8 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     print(f"Episode statistics saved to {stats_file_path}")
 
     # Plot the results as a pie chart
-    plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.show_figures, name=op_name)
+    if cfg.hockey:
+        plot_wins_vs_losses(wins, draws, losses, figures_dir, show=cfg.show_figures)
 
 @hydra.main(config_path="../configs/", config_name="config_eval", version_base=None)
 def run_evaluations(cfg: DictConfig) -> None:
@@ -156,7 +160,7 @@ def run_evaluations(cfg: DictConfig) -> None:
     silent = cfg.silent
     episodes = cfg.episodes
     show_figures = cfg.show_figures
-    
+
     GlobalHydra.instance().clear()
     config_path = os.path.join("../outputs", cfg.agent, ".hydra")
     with hydra.initialize(version_base=None, config_path=config_path):
@@ -178,4 +182,4 @@ def run_evaluations(cfg: DictConfig) -> None:
     )
 
 if __name__ == "__main__":
-    run_evaluations()
+    run_evaluations()#

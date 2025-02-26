@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - override /env: hockey-vs-basic
+
+agent: 'ddpg_hockey_bot_play_v1'
+
+episodes: 100
+episode_max_steps: 200
+show_figures: True
+hockey : True
+render: False

@@ -1,0 +1,12 @@
+agent: 'tdmpc_pendulum'
+episodes: 5
+episode_max_steps: 200
+show_figures: True
+hockey: False
+render: True
+env:
+  name: Pendulum-v1
+  opponent_type: null
+memory:
+  _target_: utils.memory.ReplayBuffer
+  capacity: 1000000

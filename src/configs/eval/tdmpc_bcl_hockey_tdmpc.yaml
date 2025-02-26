@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - override /env: hockey-vs-basic
+
+agent: 'tdmpc_bcl_weak_v0'
+
+episodes: 250
+episode_max_steps: 500
+show_figures: True
+hockey : True
+render: False

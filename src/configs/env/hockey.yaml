@@ -1,5 +1,0 @@
-name: Hockey-v0
-opponent_type: BasicOpponent
-opponent: 
-  _target_: hockey.hockey_env.BasicOpponent
-  weak: False

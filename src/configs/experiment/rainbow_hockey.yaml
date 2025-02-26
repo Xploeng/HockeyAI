@@ -3,7 +3,7 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: rainbow
-  - override /env: hockey
+  - override /env: hockey-vs-basic
 
 agent:
   name: rainbow_hockey_bot

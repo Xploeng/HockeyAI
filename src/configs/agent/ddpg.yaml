@@ -2,6 +2,8 @@ defaults:
   - memory: replay_buffer
   - training: default
 
+mode: train # train/test or opponent
+
 # type: DDPG Agent
 _target_: agents.DDPG
 _recursive_: False

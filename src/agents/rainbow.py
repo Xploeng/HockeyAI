@@ -94,7 +94,16 @@ class Rainbow(Agent):
 
     def select_action(self, state):
         self.steps_done += 1
-        return self.policy_net(state).max(1).indices.view(1, 1)
+        # forward = self.policy_net(state)
+        # print(forward.shape)
+        # forward_max = forward.max(1)
+        # print(forward_max)
+        # final = forward_max.indices
+        # print(final.shape, final)
+        # final_view = final.view(1, 1)
+        # print(final_view.shape, final_view)
+        # return final_view
+        return self.policy_net(state).max(1).indices # .view(1, 1)
 
     def record(self, state, action, next_state, reward, done):
         return self.memory.push(state, action, next_state, reward, done)
@@ -260,11 +269,12 @@ class Rainbow(Agent):
         frames = []
 
         while not done:
-            # Render the environment and save the frames
-            frame = self.env.render(mode="rgb_array") if render else None
-
-            if frame is not None:
-                frames.append(Image.fromarray(frame))
+            if render:
+                # Choose rendering parameters based on the environment type
+                render_kwargs = {"mode": "rgb_array"} if self.hockey else {}
+                frame = self.env.render(**render_kwargs)
+                if frame is not None:
+                    frames.append(Image.fromarray(frame))
 
             # Action selection and recording the transition
             action = self.select_action(state)
@@ -311,5 +321,5 @@ class Rainbow(Agent):
             {"network_state_dict": self.policy_net.state_dict(),
              "optimizer_state_dict": self.optimizer.state_dict(),
              "memory": self.memory,
-             "memory_n": self.memory_n,},
+             "memory_n": self.memory_n},
         )
