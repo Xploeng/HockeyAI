@@ -7,6 +7,19 @@ import sys
 sys.path.append("src/")
 
 from collections import defaultdict
+from tueplots import bundles
+from tueplots.constants.color import rgb
+
+
+
+plt.rcParams.update(
+    bundles.icml2022(
+        column="full",
+        nrows=1,
+        ncols=1,
+        usetex=True,
+    )
+)
 
 def smooth(y, window=10):
     """Apply smoothing to the data"""
@@ -97,12 +110,15 @@ def plot_rewards_from_memory(checkpoint, output_dir=None, window_size=10):
     if episode_rewards:
         plt.figure(figsize=(10, 6))
         episodes = range(1, len(episode_rewards) + 1)
-        plt.plot(episodes, episode_rewards, alpha=0.5, label='Episode Rewards', linewidth=2)
+        if len(episode_rewards) > 10:
+            smooth_ep_rewards = smooth(episode_rewards, window=10)
+            smooth_episodes = range(10, len(episode_rewards) + 1)
+            plt.plot(smooth_episodes, smooth_ep_rewards, color=rgb.tue_lightblue, label=f'Smoothed (window=10)', linewidth=2)
         
         if len(episode_rewards) > window_size:
             smooth_ep_rewards = smooth(episode_rewards, window=window_size)
             smooth_episodes = range(window_size, len(episode_rewards) + 1)
-            plt.plot(smooth_episodes, smooth_ep_rewards, label=f'Smoothed (window={window_size})', linewidth=2)
+            plt.plot(smooth_episodes, smooth_ep_rewards, color=rgb.tue_darkblue, label=f'Smoothed (window={window_size})', linewidth=2)
         
         plt.xlabel('Episode', fontsize=14)
         plt.ylabel('Total Reward', fontsize=14)
