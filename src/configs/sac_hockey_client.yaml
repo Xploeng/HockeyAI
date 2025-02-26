@@ -4,6 +4,7 @@ defaults:
 
 
 agent:
-  name: sac_hockey_bot_play
+  name: sac_hockey
   requires_continues_action_space: False
   mode: opponent
+  hidden_size: 400

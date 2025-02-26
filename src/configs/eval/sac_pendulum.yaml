@@ -3,9 +3,9 @@
 defaults:
   - override /env: pendulum
 
-agent: 'pendulum_sac'
+agent: 'sac_pendulum'
 
-episodes: 1
+episodes: 5
 episode_max_steps: 200
 show_figures: True
 hockey : False

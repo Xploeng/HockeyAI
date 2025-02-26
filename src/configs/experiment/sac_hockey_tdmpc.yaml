@@ -3,11 +3,11 @@
 # Override entire configuration yaml files
 defaults:
   - override /agent: sac
-  - override /env: hockey-vs-basic
+  - override /env: hockey-vs-tdmpc
 
 agent:
-  name: sac_hockey_weak
-  hidden_size: 256
+  name: sac_hockey_bot_play_v0
+  hidden_size: 400
   actor_learning_rate: 1e-4
   critic_learning_rate: 1e-4
   gamma: 0.99
@@ -15,8 +15,8 @@ agent:
   alpha: 0.2
 
   training:
-    episodes: 4001
-    batch_size: 1024
+    episodes: 10001
+    batch_size: 128
     save_agent: True
     save_interval: 10
     continue_training: True

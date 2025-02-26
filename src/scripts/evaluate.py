@@ -2,6 +2,7 @@ import os
 import sys
 
 from dataclasses import asdict
+from pathlib import Path
 import gymnasium as gym
 import hockey
 import hydra
@@ -38,7 +39,7 @@ def get_checkpoint_path(agent_name):
 
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
-        opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
+        opp_cfg_pth = Path(".") / "src" / "outputs" / cfg.env.opponent.name / ".hydra" / "config.yaml"
         with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
 
@@ -46,8 +47,13 @@ def initialize_opponent(cfg: DictConfig, env, device: torch.device):
         opp_cfg.agent.training.continue_training = True
         opp_cfg.agent.mode = 'opponent'
 
-        opp = initialize_agent(cfg=opp_cfg, env=env, device=device, checkpoint_path=get_checkpoint_path(cfg.env.opponent.name))
-        return OpponentWrapper(opp, env, opp_cfg.agent.requires_continues_action_space, device)
+        opp: Agent = initialize_agent(
+            cfg=opp_cfg,
+            env=env,
+            device=device,
+            checkpoint_path=get_checkpoint_path(cfg.env.opponent.name),
+        )
+        return OpponentWrapper(opp, env)
     elif cfg.env.opponent_type == "BasicOpponent":
         return OpponentWrapper(hydra.utils.instantiate(cfg.env.opponent), env, False, device)
 
@@ -168,9 +174,9 @@ def run_evaluations(cfg: DictConfig) -> None:
         agent_cfg.device = device
         agent_cfg.verbose = not silent
 
-    if agent_cfg.seed:
-        np.random.seed(agent_cfg.seed)
-        torch.manual_seed(agent_cfg.seed)
+    # if agent_cfg.seed:
+    #     np.random.seed(agent_cfg.seed)
+    #     torch.manual_seed(agent_cfg.seed)
 
     evaluate_model(cfg=cfg, agent_cfg=agent_cfg)
 

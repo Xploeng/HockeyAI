@@ -30,7 +30,6 @@ def get_checkpoint_path(agent_name):
 
 def initialize_opponent(cfg: DictConfig, env, device: torch.device):
     if cfg.env.opponent_type == "AgentOpponent":
-        # opp_cfg_pth = os.path.join("./src/outputs", cfg.env.opponent.name, ".hydra/config.yaml")
         opp_cfg_pth = Path(".") / "src" / "outputs" / cfg.env.opponent.name / ".hydra" / "config.yaml"
         with open(opp_cfg_pth) as file:
             opp_cfg = DictConfig(yaml.safe_load(file))
@@ -78,7 +77,8 @@ def initialize_agent(cfg: DictConfig, env: gym.Env, device: torch.device, checkp
     )
 
     start_episode = load_checkpoint(cfg, agent, checkpoint_path, device)
-    print(f"Loaded checkpoint for agent {agent.__class__.__name__} from episode {start_episode}.")
+    agent_or_opponent = 'agent' if opponent is None else 'opponent'
+    print(f"Loaded checkpoint for {agent_or_opponent} {agent.__class__.__name__} from episode {start_episode}.")
 
     return agent, start_episode
 
@@ -99,9 +99,9 @@ def run_training(cfg: DictConfig):
     """
     writer = tb.SummaryWriter(log_dir=os.path.join("src/outputs", cfg.agent.name, "tensorboard"))
 
-    if cfg.seed:
-        np.random.seed(cfg.seed)
-        torch.manual_seed(cfg.seed)
+    # if cfg.seed:
+    #     np.random.seed(cfg.seed)
+    #     torch.manual_seed(cfg.seed)
 
     device = torch.device(cfg.device)
     print(f"Using device: {device}")
@@ -113,10 +113,13 @@ def run_training(cfg: DictConfig):
     print(f"Starting training from episode {start_episode} to {start_episode + cfg.agent.training.episodes}")
     for episode in tqdm(range(start_episode, start_episode + cfg.agent.training.episodes)):
 
-        agent.train_episode()
-
-        loss = agent.losses[-1] if agent.losses else 0
-        writer.add_scalar("Loss", loss, global_step=agent.steps_done)
+        critic_losses, actor_losses, alpha_losses = agent.train_episode()
+        running_avg_rewards = agent.memory.running_avg_rewards if agent.memory.rewards else [0]
+        for crl, acl, alphal in zip(critic_losses, actor_losses, alpha_losses):
+            writer.add_scalar("Loss/critic", crl, global_step=agent.steps_done)
+            writer.add_scalar("Loss/actor", acl, global_step=agent.steps_done)
+            writer.add_scalar("Loss/alpha", alphal, global_step=agent.steps_done)
+        writer.add_scalar("Rewards (Running Avg)", running_avg_rewards, global_step=len(agent.memory))
         writer.add_scalar("Episode", episode, global_step=agent.steps_done)
         writer.add_scalar("Reward", agent.reward, global_step=agent.steps_done)
 

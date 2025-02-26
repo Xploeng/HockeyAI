@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import warnings
 
@@ -9,7 +10,6 @@ import torch
 
 from gymnasium import spaces
 from icecream import ic
-from agents.agent import Agent
 
 
 def load_checkpoint(cfg, agent, checkpoint_path, device):
@@ -31,6 +31,7 @@ def load_checkpoint(cfg, agent, checkpoint_path, device):
             warnings.simplefilter("ignore", FutureWarning)
             checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         agent.load_state_dict(**checkpoint)
+        print(checkpoint.keys())
         return checkpoint.get("episode", 0)
     else:
         return 0
@@ -110,31 +111,80 @@ class OpponentWrapper:
         self.env = env
         self.opponent = opponent
 
-        self.opp_type = 'agent' if isinstance(opponent, Agent) else 'basic'
+        from agents.ddpg import DDPG
+        from agents.rainbow import Rainbow
+        from agents.sac import SAC
+        from agents.tdmpc import TDMPC
+
+        if isinstance(opponent, DDPG):
+            self.opp_type = "ddpg"
+        elif isinstance(opponent, SAC):
+            self.opp_type = "sac"
+        elif isinstance(opponent, Rainbow):
+            self.opp_type = "rainbow"
+        elif isinstance(opponent, TDMPC):
+            self.opp_type = "tdmpc"
+        else:
+            self.opp_type = "basic"
 
     def act(self, state: torch.Tensor):
-        action = None
+        """
+        Returns the opponent's action for a given state.
 
-        if self.opp_type == 'basic':
-            if isinstance(state, torch.Tensor): # rainbow state representation
-                action = self.opponent.act(state.squeeze().cpu().numpy())
-            else: # ddpg state representation
-                action = self.opponent.act(state)
+        For basic opponents, if the state is a torch.Tensor, it is converted
+        to a NumPy array. For agent opponents, appropriate conversions and
+        method calls (like select_action) are performed.
+        """
+        if self.opp_type == "basic":
+            return self._act_basic(state)
+        elif self.opp_type == "rainbow":
+            return self._act_rainbow(state)
+        elif self.opp_type == "ddpg" or self.opp_type == "sac" or self.opp_type == "tdmpc":
+            return self._act_ddpg_sac(state)
+        else:
+            raise ValueError(f"Unsupported opponent type: {self.opp_type}")
 
-        elif self.opp_type == 'agent':
-            from agents.ddpg import DDPG
-            from agents.rainbow import Rainbow
-            from agents.sac import SAC
-            from agents.tdmpc import TDMPC
-            from agents.tdmpc_bcl import TDMPC_BCL
+    def _act_basic(self, state):
+        """Selects an action for a basic opponent. Requires a NumPy array."""
+        if isinstance(state, torch.Tensor):
+            state = state.squeeze().cpu().numpy()
 
-            if isinstance(self.opponent, Rainbow):
-                if not isinstance(state, torch.Tensor):
-                    state = torch.tensor(state, dtype=torch.float32, device=self.opponent.device)
-                action = self.opponent.select_action(state)
-                action = [self.env.discrete_to_continous_action(a.item()) for a in action]
-                action = torch.tensor(action, dtype=torch.float32, device=self.opponent.device).squeeze()
-            elif isinstance(self.opponent, (DDPG, SAC, TDMPC, TDMPC_BCL)):
-                action = self.opponent.select_action(state)
+        return self.opponent.act(state)
 
+    def _act_rainbow(self, state):
+        """Selects an action for an agent opponent."""
+        if not isinstance(state, torch.Tensor):
+            state = torch.tensor(state, dtype=torch.float32, device=self.opponent.device)
+        action = self.opponent.select_action(state)
+        # ic(action)
+        # action = self.env.discrete_to_continous_action(action.item())
+        action = [self.env.discrete_to_continous_action(a.item()) for a in action]
+        action = torch.tensor(action, dtype=torch.float32, device=self.opponent.device).squeeze()
         return action
+
+    def _act_ddpg_sac(self, state):
+        """Selects an action for an agent opponent."""
+        return self.opponent.select_action(state)
+
+    # def act(self, state: torch.Tensor):
+    #     action = None
+
+    #     if self.opp_type == 'basic':
+    #         if isinstance(state, torch.Tensor): # rainbow state representation
+    #             action = self.opponent.act(state.squeeze().cpu().numpy())
+    #         else: # ddpg state representation
+    #             action = self.opponent.act(state)
+
+    #     elif self.opp_type == 'agent':
+    #         if isinstance(self.opponent, Rainbow):
+    #             if not isinstance(state, torch.Tensor):
+    #                 state = torch.tensor(state, dtype=torch.float32, device=self.opponent.device)
+    #             action = self.opponent.select_action(state)
+    #             # ic(action)
+    #             # action = self.env.discrete_to_continous_action(action.item())
+    #             action = [self.env.discrete_to_continous_action(a.item()) for a in action]
+    #             action = torch.tensor(action, dtype=torch.float32, device=self.opponent.device).squeeze()
+    #         elif isinstance(self.opponent, DDPG):
+    #             action = self.opponent.select_action(state)
+
+    #     return action

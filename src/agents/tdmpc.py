@@ -101,7 +101,7 @@ class TDMPC(Agent):
     def select_action(self, state, evaluate=False):
         """Select action using MPC planning when training, or actor for evaluation"""
         assert state.shape[-1] == self.num_states, f"Expected state dim {self.num_states}, got {state.shape}"
-        state = torch.FloatTensor(state).to(self.device)
+        state = torch.tensor(state, dtype=torch.float, device=self.device)
         
         if evaluate or self.mode != "train":
             with torch.no_grad():
@@ -282,7 +282,7 @@ class TDMPC(Agent):
             self.world_model_optimizer.load_state_dict(agent_state_dict["world_model_optimizer_state_dict"])
             self.actor_optimizer.load_state_dict(agent_state_dict["actor_optimizer_state_dict"])
             self.value_optimizer.load_state_dict(agent_state_dict["value_optimizer_state_dict"])
-            self.memory = agent_state_dict["memory"]
+            # self.memory = agent_state_dict["memory"]
 
     def state_dict(self):
         return collections.OrderedDict({
@@ -292,5 +292,5 @@ class TDMPC(Agent):
             "world_model_optimizer_state_dict": self.world_model_optimizer.state_dict(),
             "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
             "value_optimizer_state_dict": self.value_optimizer.state_dict(),
-            "memory": self.memory,
+            # "memory": self.memory,
         })

@@ -3,6 +3,7 @@
 defaults:
   - override /env: hockey-vs-basic
 
+<<<<<<<< HEAD:src/configs/eval/tdmpc_bcl_hockey_tdmpc.yaml
 agent: 'tdmpc_bcl_weak_v0'
 
 episodes: 250
@@ -10,3 +11,12 @@ episode_max_steps: 500
 show_figures: True
 hockey : True
 render: False
+========
+agent: 'rainbow_hockey_bot_composite'
+
+episodes: 100
+episode_max_steps: 200
+show_figures: True
+hockey : True
+render: False
+>>>>>>>> SAC:src/configs/eval/rainbow_hockey_bot.yaml

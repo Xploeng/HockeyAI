@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import argparse
-import uuid
-import torch
-import hydra
-from omegaconf import DictConfig
 import os
 import sys
+import uuid
 import hockey.hockey_env as h_env
+import hydra
 import numpy as np
+import torch
+
+
 sys.path.append("src/")
-from agents.rainbow import Rainbow
-from scripts.train import get_checkpoint_path
-from utils.helper import DiscreteActionWrapper, load_checkpoint
-
-
 from comprl.client import Agent, launch_client
+# from agents import Agent
+from utils.helper import DiscreteActionWrapper, load_checkpoint
 
 
 class RandomAgent(Agent):
@@ -29,10 +27,7 @@ class RandomAgent(Agent):
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 class HockeyAgent(Agent):
@@ -55,15 +50,12 @@ class HockeyAgent(Agent):
         return action
 
     def on_start_game(self, game_id) -> None:
-        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
         print(f"Game started (id: {game_id})")
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"Game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 class RainbowHockeyAgent(Agent):
@@ -71,30 +63,31 @@ class RainbowHockeyAgent(Agent):
 
     def __init__(self, config_path: str) -> None:
         super().__init__()
-        
+
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Load the config
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg = hydra.compose(config_name=config_path)
-            
+
         # Initialize environment
         self.env = h_env.HockeyEnv()
         if not cfg.agent.requires_continues_action_space:
             self.env = DiscreteActionWrapper(self.env, bins=cfg.agent.bins)
-            
+
         # Initialize the Rainbow agent
         self.rainbow = hydra.utils.instantiate(
             config=cfg.agent,
             env=self.env,
-            opponent=None, 
+            opponent=None,
             device=self.device,
             recursive=False,
         )
-        cfg.agent.training.continue_training = True
+
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/rainbow_hockey_bot_0/checkpoints/rainbow_hockey_bot_last.ckpt"
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/rainbow_hockey_bot_composite/checkpoints/rainbow_hockey_bot_composite_last.ckpt"
+        cfg.agent.training.continue_training = True
         if os.path.exists(checkpoint_path):
             eps = load_checkpoint(cfg, self.rainbow, checkpoint_path, self.device)
             print(f"Loaded checkpoint from {checkpoint_path} eps: {eps}")
@@ -108,15 +101,12 @@ class RainbowHockeyAgent(Agent):
         return action[0]
 
     def on_start_game(self, game_id) -> None:
-        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
         print(f"Game started (id: {game_id})")
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"Game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 class SACHockeyAgent(Agent):
@@ -124,50 +114,50 @@ class SACHockeyAgent(Agent):
 
     def __init__(self, config_path: str) -> None:
         super().__init__()
-        
+
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Load the config
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg = hydra.compose(config_name=config_path)
-            
+
         # Initialize environment
         self.env = h_env.HockeyEnv()
-            
+
         # Initialize the SAC agent
         self.sac = hydra.utils.instantiate(
             config=cfg.agent,
             env=self.env,
             opponent=None,
             device=self.device,
-            mode='opponent',
+            mode="opponent",
             recursive=False,
         )
+
         cfg.agent.training.continue_training = True
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/rainbow_hockey_bot_composite_last.ckpt"  # Update this path
+        # checkpoint_path = "/home/tluebbing/workspace/studies/HockeyAI/src/outputs/sac_hockey_bot_play_v0/checkpoints/sac_hockey_bot_play_v0_last.ckpt"
+        checkpoint_path = "/home/tluebbing/workspace/studies/HockeyAI/src/outputs/sac_hockey/checkpoints/sac_hockey_last.ckpt"
         if os.path.exists(checkpoint_path):
-            load_checkpoint(cfg, self.sac, checkpoint_path, self.device)
+            episode = load_checkpoint(cfg, self.sac, checkpoint_path, self.device)
             print(f"Loaded checkpoint from {checkpoint_path}")
+            print(f"Checkpoint loaded from episode {episode}")
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
     def get_step(self, observation: list[float]) -> list[float]:
-        state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
-        action = self.sac.select_action(state.squeeze(0), deterministic=True)
+        state = torch.tensor(observation, dtype=torch.float32, device=self.device)
+        action = self.sac.select_action(state, deterministic=True)
         return action.tolist()
 
     def on_start_game(self, game_id) -> None:
-        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
         print(f"Game started (id: {game_id})")
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"Game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 class TDMPCHockeyAgent(Agent):
@@ -175,37 +165,36 @@ class TDMPCHockeyAgent(Agent):
 
     def __init__(self, config_path: str) -> None:
         super().__init__()
-        
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Load the config
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg = hydra.compose(config_name=config_path)
-            
+
         # Initialize environment
         self.env = h_env.HockeyEnv()
-        
+
         # Force full action space for world model to match training
-        full_action_dim = self.env.action_space.shape[0] # 4 for hockey
-        
+        full_action_dim = self.env.action_space.shape[0]  # 4 for hockey
+
         # Initialize the TDMPC agent with full action dim for world model
         self.tdmpc = hydra.utils.instantiate(
             config=cfg.agent,
             env=self.env,
             opponent=None,
             device=self.device,
-            mode='opponent',
+            mode="opponent",
             action_dim=full_action_dim,  # Force full action dimension
             recursive=False,
         )
-        
+
         # Load the checkpoint
         checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_hockey_sac_play/checkpoints/tdmpc_hockey_sac_play_last.ckpt"
         cfg.agent.training.continue_training = True
         if os.path.exists(checkpoint_path):
-            eps = load_checkpoint(cfg, self.tdmpc, checkpoint_path, self.device)
-            print(f"Loaded checkpoint from {checkpoint_path} eps: {eps}")
+            load_checkpoint(cfg, self.tdmpc, checkpoint_path, self.device)
+            print(f"Loaded checkpoint from {checkpoint_path}")
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
@@ -215,15 +204,12 @@ class TDMPCHockeyAgent(Agent):
         return action.tolist()
 
     def on_start_game(self, game_id) -> None:
-        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
         print(f"Game started (id: {game_id})")
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"Game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 class TDMPCBCLHockeyAgent(Agent):
@@ -231,17 +217,17 @@ class TDMPCBCLHockeyAgent(Agent):
 
     def __init__(self, config_path: str) -> None:
         super().__init__()
-        
+
         # Initialize device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Load the config
         with hydra.initialize(version_base=None, config_path="../configs"):
             cfg = hydra.compose(config_name=config_path)
-            
+
         # Initialize environment
         self.env = h_env.HockeyEnv()
-        full_action_dim = self.env.action_space.shape[0] # 4 for hockey
+        full_action_dim = self.env.action_space.shape[0]  # 4 for hockey
 
         # Initialize the TDMPC_BCL agent
         self.tdmpc_bcl = hydra.utils.instantiate(
@@ -249,13 +235,13 @@ class TDMPCBCLHockeyAgent(Agent):
             env=self.env,
             opponent=None,
             device=self.device,
-            mode='opponent',
+            mode="opponent",
             action_dim=full_action_dim,  # Force full action dimension
             recursive=False,
         )
-        
+
         # Load the checkpoint
-        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/src/outputs/tdmpc_bcl_hockey_tdmpc_play/checkpoints/tdmpc_bcl_hockey_tdmpc_play_last.ckpt"
+        checkpoint_path = "/Users/ericnazarenus/Library/Mobile Documents/com~apple~CloudDocs/Uni/WS2024/Reinforcement Learning/HockeyAI/tdmpc_bcl_hockey_tdmpc_play.ckpt"
         cfg.agent.training.continue_training = True
         if os.path.exists(checkpoint_path):
             load_checkpoint(cfg, self.tdmpc_bcl, checkpoint_path, self.device)
@@ -263,24 +249,18 @@ class TDMPCBCLHockeyAgent(Agent):
         else:
             raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
-    def get_step(self, observation: list[float]) -> list[float]:        
+    def get_step(self, observation: list[float]) -> list[float]:
         state = torch.tensor(observation, dtype=torch.float32, device=self.device)
-        
-        # Get action from model
         action = self.tdmpc_bcl.select_action(state, evaluate=True)
-                    
         return action.tolist()
 
     def on_start_game(self, game_id) -> None:
-        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder='big'))
+        game_id = uuid.UUID(int=int.from_bytes(game_id, byteorder="big"))
         print(f"Game started (id: {game_id})")
 
     def on_end_game(self, result: bool, stats: list[float]) -> None:
         text_result = "won" if result else "lost"
-        print(
-            f"Game ended: {text_result} with my score: "
-            f"{stats[0]} against the opponent with score: {stats[1]}"
-        )
+        print(f"Game ended: {text_result} with my score: " f"{stats[0]} against the opponent with score: {stats[1]}")
 
 
 # Function to initialize the agent.  This function is used with `launch_client` below,
@@ -299,7 +279,7 @@ def initialize_agent(agent_args: list[str]) -> Agent:
         "--config",
         type=str,
         default="rainbow_hockey_client.yaml",
-        help="Path to config file for Rainbow/SAC/TDMPC agent.",
+        help="Path to config file for Rainbow/SAC agent.",
     )
     args = parser.parse_args(agent_args)
 

@@ -6,7 +6,7 @@ defaults:
   - override hydra/job_logging: disabled
 
 device: cuda:0
-seed: 1234
+seed: None
 verbose : True
 env: Pendulum-v1
 

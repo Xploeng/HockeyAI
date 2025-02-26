@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
 
-from torchrl.modules import NoisyLinear
+# from torchrl.modules import NoisyLinear
 
 
 class SACActor(nn.Module):
@@ -41,7 +41,13 @@ class SACActor(nn.Module):
         return action, log_prob, mean
 
     def select_action(self, state, deterministic=False):
-        state = torch.FloatTensor(state).unsqueeze(0).to(next(self.parameters()).device)
+        # NumPy array if state comes from agent
+        # torch tensor if state comes from opponent wrapper (optimize loop)
+        state = (
+            state if isinstance(state, torch.Tensor)
+            else torch.tensor(state, dtype=torch.float)
+        )
+        state = state.unsqueeze(0).to(next(self.parameters()).device)
         mean, log_std = self.forward(state)
         if deterministic:
             action = torch.tanh(mean)
