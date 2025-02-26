@@ -14,7 +14,7 @@ from tueplots.constants.color import rgb
 
 plt.rcParams.update(
     bundles.icml2022(
-        column="full",
+        column="half",
         nrows=1,
         ncols=1,
         usetex=True,
