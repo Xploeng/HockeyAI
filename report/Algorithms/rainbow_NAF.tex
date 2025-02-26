@@ -9,12 +9,7 @@ $$Q_{i+1}(s,a) = \nE_{s'}[R_{t+1} + \max_{a'} Q_{i}(s', a')|s,a]$$
 \paragraph{Deep Q-learning} \cite{deep-q} parameterizes the Q-function $Q(s,a;\theta_i)$ as a deep neural network. In typical DL fashion, we use a loss function to optimize the parameters $\theta$:
 $$\cL(\theta_i) = \nE_{s,a}\left[(y_i - Q(s,a;\theta_i))^2\right]$$ where 
 $y_i = \nE_{s'}[R_{t+1} + \max_{a'} Q_{i-1}(s', a')|s,a]$ is the optimization target. 
-Now they define the gradient as:
-$$\nabla_{\theta_i} L_i (\theta_i) = 
-\mathbb{E}_{s, a, s'} 
-\left[ \left( R + \max_{a'} Q(s', a'; \theta_{i-1}) - Q(s, a; \theta_i) \right) 
-\nabla_{\theta_i} Q(s, a; \theta_i) \right]$$
-In practise, we maintain a target network $\tilde\theta$ alongside the policy network, which we update periodically.
+In practise, we maintain a target network $\tilde\theta$ alongside the policy network, which we update periodically.\\
 We also approximate the expectation by sampling $s,a,s'$ from an experience replay buffer that stores all previously observed transitions (state, generated action, next state).
 
 \subsubsection{Rainbow}
@@ -35,11 +30,8 @@ $$Q(s,a;\theta) = V(f(s;\theta^F);\theta^V) + A(f(s;\theta^F), a;\theta^F) - \df
 \paragraph{Multi-step learning} introduces multi-step targets instead of accumulated single rewards.
 The truncated n-step return for $s_t$ is:
 $$R_t^{(n)}=\Sigma_{k=0}^{n-1} R_{t+k+1} $$
-which induces an alternative loss:
-$$(R_t^{(n)} + \arg\max_{a'}Q_t(s_{t+n},a';\tilde\theta)  - Q_t(s_t,a_t;\theta))^2$$
 
-\paragraph{Distributional RL} learns to approximate the distribution of rewards instead of the expected return. \cite{distributionalRL} models that distribution with probability masses on discrete support vectors $z$ with N atoms.
-$$z_i = v_{min} + (i-1)\dfrac{v_{max}-v_{min}}{N_{atoms}-1} $$.
+\paragraph{Distributional RL} learns to approximate the distribution of rewards instead of the expected return. \cite{distributionalRL} models that distribution with probability masses on discrete support vectors $z$ with N atoms.\\
 The probability mass of atom i at time t is $p^i(s_t, a_t; \theta)$ and the goal is to update $\theta$ such that this distribution matches the actual distribution of returns.
 They use the Kullback-Leibler divergence to construct the loss between the target and policy distribution, similar to the previous methods.
 
@@ -52,19 +44,14 @@ DQN has the problem, that the method is bound to discrete action spaces where ma
 But there are many cases where we are dealing with continuous action spaces and that is why in \cite{NAF} the authors introduce a new algorithm called Normalized Advantage function, that is based on Duelling DQN and is able to deal with continuous action spaces.\\
 Recall that in duelling DQN, the Q-function is composed of a value and an advantage function. NAF parameterizes the advantage function $a(s,a)$ as a quadratic function of nonlinear features of the state:
 \begin{align*}
-    x &= f(s;\theta^F)\\
-    Q(s,a;\theta) &= V(x;\theta^V) + A(x, a;\theta^A)\\
-    A(s,a;\theta^A) &= -\frac{1}{2}(\mb a-\mb \mu(x;\theta^{\mu}))^\top \mb P(x;\theta^P)(\mb a-\mb \mu(x;\theta^\mu))
+    Q(s,a;\theta) &= V(f(s;\theta^F);\theta^V) + A(f(s;\theta^F), a;\theta^A)\\
+    A(s,a;\theta^A) &= -\frac{1}{2}(\mb a-\mb \mu(f(s;\theta^F);\theta^{\mu}))^\top \mb P(f(s;\theta^F);\theta^P)(\mb a-\mb \mu(f(s;\theta^F);\theta^\mu))
 \end{align*}
 where $P(x;\theta^P)$ is a positive-definite square matrix which is parameterized by $P(x;\theta^P) = L(x;\theta^P)L(x;\theta^P)^\top$ where L is a lower-triangular matrix whose entries come from a linear output layer.\\
 Since Q is quadratic in $a$ the maximum is always given by $\mu(x;\theta^\mu)$.\\
-Since NAF is based on duelling DQN, many of the improvements applied in Rainbow could be used in NAF as well.\\
 
 \subsubsection{Application to Laser Hockey}
-Laser hockey has an 18 dimensional observation space and a 4 dimensional continuous action space.
-The game is also adversarial, which none of the algorithms take into account. 
+The game is adversarial, which none of the algorithms take into account. 
 But the environment delivers 2 additional rewards, a reward for touching the puck and a reward based on the movement direction of the puck, additionally to the standard reward of distance to the puck and a substantial win reward or loss penalty.\\
-From this additional information, I constructed a compositional loss that simply adds the different rewards in order to lower the impact of the win/loss reward and facilitate learning from truncated games.\\
-I evaluated NAF and Rainbow, both with and without the compositional reward. For time reasons, training was mainly performed against the BasicOpponent.\\
-NAF works naturally with the continuous action space, but Rainbow requires conversion of discrete actions to continuous ones, which is provided by the environment. Not that this restricts the Rainbow agent to one-hot continuous actions meaning it can either turn, shoot, move in x direction or in y direction.
+From this additional information, I constructed a compositional reward that simply adds the different rewards in order to lower the impact of the win/loss reward and facilitate learning from truncated games.\\
 

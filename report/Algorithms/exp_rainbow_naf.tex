@@ -4,20 +4,36 @@
 Some code for Rainbow (especially the PER, N-step memory and categorical, noisy, duelling Q-function approximator) is adapted from \cite{rainbow_GitHub}.\\
 The NAF Q-function approximator is adapted from \cite{NAF_GitHub}.
 
-\subsubsection{Pendulum-v1}
+\subsubsection{Baseline}
 
-\paragraph{NAF} solves Pendulum-v1 relatively quickly, but only when provided with a feature extractor with sufficient capacity (256 nodes).\\
-Employing NoisyLinar layers as in Rainbow also does not work and completely destroys any learning. \cite{NAF} uses Gaussian noise during training, which works much better.
-
-\paragraph{Rainbow} without any tuning solves CartPole-v1 to absolution and always achieves maximum reward after about an hour of training.
+\paragraph{CartPole-v1} is a simple game with a discrete action space. That is why I used it to evaluate Rainbow initially.
+Rainbow completely solves this game in 400 epochs.\\
+\paragraph{Pendulum-v1} is also a simple game that requires precise continuous control. 
+In that regard it is similar to the Hockey environment and that's why I choose it as a continuous baseline.\\
+\textbf{Rainbow} has difficulties with Pendulum, as it oscillates heavily. I suspect it could solve this game at some point, though.\\
+\textbf{NAF} (especially with N-step learning) learns to be good at Pendulum quite quickly if it does not use NoisyLinear layers.
+\begin{figure}[h]
+    \includegraphics[width=0.5\linewidth]{Plots/cartpole_rainbow_reward.pdf}
+    \includegraphics[width=0.5\linewidth]{Plots/pendulum_rewards.pdf}
+\end{figure}
 
 \subsubsection{Hockey}
-The Rainbow agent learns well and is able to get the loss to converge. Unfortunately, the 7 discrete action space is severally limited, and the agent hits a ceiling of around 35\% wins, 25\% draws and 40\% losses against the strong agent.\\
+The Rainbow agent learns well and is able to get the loss to converge. Unfortunately, the 7 discrete action space is severally limited, and the agent hits a ceiling of around 41\% wins, 19\% draws and 40\% losses against the strong agent and 57\% wins, 18\% draws and 25\% losses against the weak opponent.\\
 I tried many different things to break this ceiling such as self training, self training alternated with bot training, training against other agents but nothing did.
-As Rainbow quickly learns to defeat itself and NAF very consistently, it seems to me that the limitations on the control are too severe to beat the strong Bot.\\
-That is why I switched my approach to NAF.\\
-Even though NAF works well with Pendulum, it does not perform well against the Bots.
-Unfortunately, I did not have time to train a NAF agent as long as I did the Rainbow one, so there is the possibility that NAF just converges slow but might be able to break the ceiling encountered by Rainbow.\\
-As a final experiment I wrote my own discrete to continuous conversion enabling me to scale up the action space.
-Rainbow now learns (bins*2 x bins*2 x bins*2) space, of a bin for movement in x, movement in y and rotation. The *2 is a binary variable for shooting the ball.\\
-This obviously enlarges the action space significantly, but also gives the Rainbow agent much more and simultaneous control over the continuous actions.
+As Rainbow quickly learns to defeat itself and NAF very consistently, it seems to me that the limitations on the control are too severe to beat the strong Opponent.\\
+That (and Rainbows Pendulum performance) is why I changed my approach and added some potential improvements. Normalized advantage function (NAF), a composite reward designed to punish draws more heavily, and a discrete to continuous conversion enabling me to scale up the action space.\\
+Rainbow now learns a binned action cube with a dimension for moving vertically, moving horizontally and turning. The cube is doubled for adding a binary shooting variable.\\
+This obviously enlarges the action space significantly, but also gives the Rainbow agent much more and simultaneous control over the continuous actions.\\
+
+\paragraph{NAF} seems to work great, but improvement is slow. The first thounsad episodes already reach a higher reward average than Binned rainbow after 2000 episodes.
+Unfortunately, I was unable to train NAF for longer due to time constraints.
+If I had more time, this is the algorithm I would focus on, as I see the most potential here, as the average reward grows quicker than for Rainbow and the way the control works is more natural.
+\paragraph{Binned Rainbow} struggles greatly in the beginning and learns slowly, but steadily. This is to be expected, as it is difficult to optimize large discrete spaces.
+In the only training run, I used 7 bins ($7^3\cdot 2 = 686$ discrete actions) and the composite reward mentioned earlier.\\
+Note that it took this agent 6000 episodes to reach a still not great average.\\
+With more training, I am sure this agent could reach much better rewards.\\
+It reaches a 40\%, 19\% loss and 41\% losses against the strong opponent, basically matching the other Rainbow agent.\\
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{Plots/hockey.pdf}
+\end{figure}

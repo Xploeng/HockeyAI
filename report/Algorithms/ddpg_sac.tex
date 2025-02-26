@@ -3,12 +3,12 @@ Deep deterministic Policy Gradient (DDPG) is an off-policy reinforcement learnin
 \[
 a^*(s) = \arg\max_a Q(s,a),
 \]
-DDPG instead approximates the optimal action with a policy \(\mu(s)\) so that \(a^*(s) \approx \mu(s)\). This avoids the need for an exhaustive search over a continuous action space. A central challenge in DDPG is computing the target value when the action space is continuous. DDPG addresses this by employing a target policy network \(\mu_{\theta_{\text{targ}}}\) whose parameters are updated by Polyak averaging $\theta_{\text{targ}} \leftarrow \rho\,\theta_{\text{targ}} + (1-\rho)\,\theta.$
+DDPG instead approximates the optimal action with a policy \(\mu(s)\) so that \(a^*(s) \approx \mu(s)\). This avoids the need for an exhaustive search over a continuous action space. A central challenge in DDPG is computing the target value when the action space is continuous. DDPG addresses this by employing a target policy network \(\mu_{\theta_{\text{targ}}}\). 
 The critic’s target value is then computed as
 \[
 y = r + \gamma\,(1-d)\,Q_{\text{target}}\bigl(s',\mu_{\theta_{\text{targ}}}(s')\bigr),
 \]
-where \(d\) indicates whether the next state is terminal. The critic is trained to minimize the mean-squared error loss
+where \(d\) indicates whether the next state is terminal. The critic is trained to minimize the mean-squared bellman error loss
 \[
 L(\phi) = \mathbb{E}_{(s,a,r,s',d)\sim\mathcal{D}}\!\left[\Bigl(Q_\phi(s,a) - y\Bigr)^2\right].
 \]
