@@ -272,7 +272,10 @@ class Rainbow(Agent):
             if self.hockey:
                 opp_state = self.env.obs_agent_two()
                 opp_action = self.opponent.act(opp_state)
-                act = self.env.discrete_to_continous_action(action.item())
+                if self.binned:
+                    act =  discrete_to_continuous_action(action.item(), self.bins, True)
+                else:
+                    act = self.env.discrete_to_continous_action(action.item())
                 act = np.hstack([act, opp_action])
             else:
                 act = action.item()

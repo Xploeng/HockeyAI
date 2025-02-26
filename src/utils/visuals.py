@@ -226,7 +226,7 @@ def plot_q_function_all_dims(agent: Any, env_name: str, out_dir: str) -> None:
     print(f"Value function surface figures saved to {out_dir}")
 
 
-def plot_wins_vs_losses(wins, draws, losses, save_path, show=True):
+def plot_wins_vs_losses(wins, draws, losses, save_path, show=True,name=""):
     labels = "Wins", "Draws", "Losses"
     sizes = [wins, draws, losses]
     colors = ["#ff9999", "#66b3ff", "#99ff99"]
@@ -249,7 +249,7 @@ def plot_wins_vs_losses(wins, draws, losses, save_path, show=True):
         autotext.set_color("white")
         autotext.set_fontsize(12)
 
-    pie_chart_path = os.path.join(save_path, "winrate.png")
+    pie_chart_path = os.path.join(save_path, f"winrate_{name}.png")
     fig1.savefig(pie_chart_path)
     print(f"Evaluation pie chart saved to {pie_chart_path}")
     if show:

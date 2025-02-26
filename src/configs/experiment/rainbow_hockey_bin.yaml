@@ -6,23 +6,29 @@ defaults:
   - override /env: hockey
 
 agent:
-  name: rainbow_hockey_binned
+  name: rainbow_hockey_binned_strong
   requires_continues_action_space: True
 
   network:
     hidden_size: 256
+
+  memory:
+    capacity: 100000
+  n_memory:
+    capacity: 100000
+    n_steps: 7
 
   training:
     composite_loss: True
     criterion: 
       reduction: 'none'
     optimizer:
-      lr: 1e-3
-    episodes: 500
+      lr: 1e-4
+    episodes: 5001
     batch_size: 128
     save_agent: True
-    continue_training: False
+    continue_training: True
 
 env:
   opponent:
-    weak: True
+    weak: False

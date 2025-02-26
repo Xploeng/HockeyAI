@@ -1,4 +1,4 @@
 _target_: utils.NStepBuffer
 capacity: 10000
-n_steps: 3
+n_steps: 7
 gamma: 0.99

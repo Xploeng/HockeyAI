@@ -7,7 +7,7 @@ defaults:
   - override /agent/network: NAF
 
 agent:
-  name: pendulum_naf_n_step
+  name: pendulum_naf_std
   requires_continues_action_space: True
 
   network:
@@ -23,7 +23,7 @@ agent:
     continue_training: False
 
   memory:
-    n_steps: 3
+    n_steps: 1
     capacity: 100000
   n_memory:
     capacity: 100000

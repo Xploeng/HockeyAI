@@ -1,20 +1,20 @@
 # @package _global_
 
-device: cuda:0
-env: 
-  name: CartPole-v1
+# Override entire configuration yaml files
+defaults:
+  - override /agent: rainbow
 
 agent:
-  name: cartpole-dql
-  eps_start: 0.9
-  eps_end: 0.05
-  eps_decay: 1000
+  name: cartpole_rainbow
 
   network:
-    hidden_size: 128
+    hidden_size: 256
 
   training:
-    episodes: 100
+    criterion: 
+      reduction: 'none'
+    episodes: 201
     batch_size: 128
     save_agent: True
     continue_training: True
+    save_interval: 100

@@ -119,7 +119,7 @@ def evaluate_model(cfg: DictConfig, agent_cfg: DictConfig) -> None:
     all_episode_stats = {}
     print(f"\nEvaluating the model on {cfg.episodes} episodes.")
     if cfg.hockey:
-        op_name = agent_cfg.env.opponent.name if cfg.env.opponent_type == "AgentOpponent" else f"BasicOpponent_{"weak" if cfg.env.opponent.weak else "strong"}"
+        op_name = agent_cfg.env.opponent.name if cfg.env.opponent_type == "AgentOpponent" else f"BasicOpponent_{'weak' if cfg.env.opponent.weak else 'strong'}"
         print("Hockey mode enabled.")
         print(f"Evaluating {cfg.agent} against {op_name}.")
     for episode in tqdm(range(cfg.episodes)):
