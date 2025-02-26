@@ -10,19 +10,23 @@ agent:
   requires_continues_action_space: True
 
   network:
-    hidden_size: 128
+    hidden_size: 256
 
   training:
     composite_loss: True
     criterion: 
       reduction: 'none'
-    episodes: 1000
+    optimizer:
+      lr: 1e-4
+    episodes: 1001
     batch_size: 128
     save_agent: True
-    continue_training: False
+    continue_training: True
 
   memory:
-    n_steps: 1
+    capacity: 100000
+  n_memory:
+    capacity: 100000
 
 env:
   opponent:

@@ -5,12 +5,12 @@ defaults:
 
 agent: 'rainbow_naf'
 
-episodes: 300
+episodes: 5
 episode_max_steps: 400
 show_figures: True
 hockey : True
-render: False
+render: True
 
 env:
   opponent:
-    weak: True
+    weak: False
