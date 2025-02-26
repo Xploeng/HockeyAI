@@ -2390,6 +2390,24 @@ tests = ["autopep8", "flake8", "isort", "llnl-hatchet", "numpy", "pytest", "scip
 tutorials = ["matplotlib", "pandas", "tabulate"]
 
 [[package]]
+name = "tueplots"
+version = "0.2.0"
+description = "Scientific plotting made easy."
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "tueplots-0.2.0-py3-none-any.whl", hash = "sha256:319e8b52b12ddd599ee98dc51348283b3165837897d26c713753edbbce0633be"},
+]
+
+[package.dependencies]
+matplotlib = "*"
+numpy = "*"
+
+[package.extras]
+ci = ["tox"]
+examples = ["jupyter"]
+
+[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -2431,4 +2449,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "4a99406c8ed82790cc11c0217c9fbffcaedcfcb04d68bbc5e49242f837f0e682"
+content-hash = "a314baa0908e7f0c678e67f770fb4e0d67e86a1e837fbfaeb606c01a8e33f00e"

@@ -1,0 +1,48 @@
+\subsection{Deep deterministic policy gradient}
+Deep deterministic Policy Gradient (DDPG) is an off-policy reinforcement learning algorithm that learns a Q-function and a deterministic policy for continous environments \cite{ddpg_original}. Since it is closely connected to Deep Q-learning, this section will compress the key changes going from discrete (Deep) Q-learning to DDPG. Unlike deep Q-learning, which computes the optimal discrete action via
+\[
+a^*(s) = \arg\max_a Q(s,a),
+\]
+DDPG instead approximates the optimal action with a policy \(\mu(s)\) so that \(a^*(s) \approx \mu(s)\). This avoids the need for an exhaustive search over a continuous action space. A central challenge in DDPG is computing the target value when the action space is continuous. DDPG addresses this by employing a target policy network \(\mu_{\theta_{\text{targ}}}\) whose parameters are updated by Polyak averaging $\theta_{\text{targ}} \leftarrow \rho\,\theta_{\text{targ}} + (1-\rho)\,\theta.$
+The critic’s target value is then computed as
+\[
+y = r + \gamma\,(1-d)\,Q_{\text{target}}\bigl(s',\mu_{\theta_{\text{targ}}}(s')\bigr),
+\]
+where \(d\) indicates whether the next state is terminal. The critic is trained to minimize the mean-squared error loss
+\[
+L(\phi) = \mathbb{E}_{(s,a,r,s',d)\sim\mathcal{D}}\!\left[\Bigl(Q_\phi(s,a) - y\Bigr)^2\right].
+\]
+On the policy side, DDPG uses the deterministic policy gradient, which is computed by backpropagating through the critic:
+\[
+\nabla_{\theta} J \approx \mathbb{E}_{s\sim\mathcal{D}}\!\left[\nabla_a Q_\phi(s,a)\Big|_{a=\mu(s)}\,\nabla_{\theta}\mu(s)\right].
+\]
+
+\paragraph{Exploration}
+Since the learned policy is deterministic, exploration must be induced by adding noise to the actions during training. Common choices include uncorrelated white Gaussian noise and temporally correlated Ornstein-Uhlenbeck (OU) noise which is closely related to Brownian motion (red noise). At test time, the noise is removed so that the agent fully exploits the learned policy.
+
+\paragraph{Colored (Pink) Noise}
+Colored noise is characterized by a power spectral density that follows a power-law, i.e., 
+\( |\hat{\epsilon}(f)|^2 \propto f^{-\beta} \),
+where \(\beta\) is the color parameter controlling temporal correlations in the signal \cite{eberhard2023pink}. When \(\beta = 0\), the noise is white, meaning all frequencies are equally represented and the signal is uncorrelated in time. In contrast, red noise, with \(\beta = 2\), emphasizes lower frequencies and exhibits strong temporal correlations, similar to Brownian motion or OU noise. By setting \(\beta = 1\), we obtain pink noise, which offers an intermediate level of temporal correlation. The authors propose that this balance makes pink noise particularly attractive for exploration in reinforcement learning, as it can provide more natural action perturbations than white or strongly correlated red noise. 
+
+\subsection{Soft Actor Critic}
+We added this promising algorithm as a natural extension to DDPG with its manual noise process selection. More details on our thought process can be found in the experiments section. Soft Actor-Critic (SAC) builds upon DDPG by replacing the deterministic policy with a stochastic one and by explicitly incorporating an entropy bonus into the objective, which naturally balances exploration and exploitation\cite{HaarnojaAbbeelLevine2018:SAC}. In SAC, the policy \(\pi_\theta(a|s)\) is optimized not only to maximize the expected return but also to maintain high entropy. This is reflected in the entropy-augmented value function, which can be expressed as
+\[
+V^{\pi}(s) = \mathbb{E}_{a\sim\pi}\!\left[Q^{\pi}(s,a)-\alpha\log\pi(a|s)\right],
+\]
+where \(\alpha\) is a temperature parameter that controls the trade-off between reward and entropy.
+
+For the critic, SAC uses two Q-networks and computes the target by sampling the next action from the current policy. The target value is given by
+\[
+y = r + \gamma\,(1-d)\left(\min_{j=1,2}Q_{\phi_j}\bigl(s',\tilde{a}'\bigr)-\alpha\log\pi_\theta\bigl(\tilde{a}'|s'\bigr)\right),
+\]
+where the next action \(\tilde{a}'\) is drawn from the current policy. The policy itself is modeled as a squashed Gaussian, and actions are sampled via the reparameterization trick:
+\[
+\tilde{a}_\theta(s,\xi)=\tanh\Bigl(\mu_\theta(s)+\sigma_\theta(s)\odot\xi\Bigr),\quad \xi\sim\mathcal{N}(0,I).
+\]
+The policy is then optimized by maximizing the expected Q-value while penalizing the log-probability of the actions, which leads to the objective
+\[
+\max_\theta\,\mathbb{E}_{s,\xi}\!\left[\min_{j=1,2}Q_{\phi_j}\bigl(s,\tilde{a}_\theta(s,\xi)\bigr)-\alpha\log\pi_\theta\bigl(\tilde{a}_\theta(s,\xi)|s\bigr)\right].
+\]
+By combining stochastic policy learning with twin Q-networks and entropy regularization, SAC achieves a more robust balance between exploration and exploitation compared to DDPG, while also reducing overestimation bias.
+

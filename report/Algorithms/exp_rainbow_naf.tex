@@ -1,0 +1,23 @@
+\subsection{Rainbow and NAF}
+
+\paragraph{Implementations}
+Some code for Rainbow (especially the PER, N-step memory and categorical, noisy, duelling Q-function approximator) is adapted from \cite{rainbow_GitHub}.\\
+The NAF Q-function approximator is adapted from \cite{NAF_GitHub}.
+
+\subsubsection{Pendulum-v1}
+
+\paragraph{NAF} solves Pendulum-v1 relatively quickly, but only when provided with a feature extractor with sufficient capacity (256 nodes).\\
+Employing NoisyLinar layers as in Rainbow also does not work and completely destroys any learning. \cite{NAF} uses Gaussian noise during training, which works much better.
+
+\paragraph{Rainbow} without any tuning solves CartPole-v1 to absolution and always achieves maximum reward after about an hour of training.
+
+\subsubsection{Hockey}
+The Rainbow agent learns well and is able to get the loss to converge. Unfortunately, the 7 discrete action space is severally limited, and the agent hits a ceiling of around 35\% wins, 25\% draws and 40\% losses against the strong agent.\\
+I tried many different things to break this ceiling such as self training, self training alternated with bot training, training against other agents but nothing did.
+As Rainbow quickly learns to defeat itself and NAF very consistently, it seems to me that the limitations on the control are too severe to beat the strong Bot.\\
+That is why I switched my approach to NAF.\\
+Even though NAF works well with Pendulum, it does not perform well against the Bots.
+Unfortunately, I did not have time to train a NAF agent as long as I did the Rainbow one, so there is the possibility that NAF just converges slow but might be able to break the ceiling encountered by Rainbow.\\
+As a final experiment I wrote my own discrete to continuous conversion enabling me to scale up the action space.
+Rainbow now learns (bins*2 x bins*2 x bins*2) space, of a bin for movement in x, movement in y and rotation. The *2 is a binary variable for shooting the ball.\\
+This obviously enlarges the action space significantly, but also gives the Rainbow agent much more and simultaneous control over the continuous actions.

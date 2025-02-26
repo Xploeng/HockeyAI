@@ -1,0 +1,97 @@
+\subsection{Temporal Difference Learning for Model Predictive Control}
+
+We implement Temporal Difference Learning for Model Predictive Control (TDMPC) \cite{tdmpc}. TDMPC combines the predictive capabilities of Model Predictive Control (MPC) \cite{mpc} with the adaptive learning properties of Temporal Difference (TD) Learning \cite{td_sutton}. We augment the basic TDMPC algorithmn by integrating behavioral cloning \cite{Torabi2018BehavioralCF} and adding dynamic exploration via temperature decay. These enhancements aim to improve the balance of exploration and exploitation.
+
+\subsubsection{Algorithm Overview}
+
+TDMPC consists of three key components: (1) a world model that predicts system dynamics, (2) a model predictive control (MPC) planning strategy that employs a learned actor to generate proposal distributions, and (3) a value function that evaluates trajectories. During training, MPC selects actions by optimizing the value function over a finite planning horizon, with a decaying temperature parameter regulating exploration. Behavioral cloning then refines the actor network to replicate the final action chosen by the MPC process. At deployment, the trained actor network directly handles action selection, making inference computationally efficient.
+
+\subsubsection{World Model}
+
+The world model predicts the next state $s_{t+1}$ and reward $r_t$ given the current state $s_t$ and action $a_t$. It consists of a neural network with architecture:
+
+\begin{equation}
+\hat{s}_{t+1} = f_\theta(s_t, a_t), \quad \hat{r}_t = g_\theta(s_t, a_t, s_{t+1})
+\end{equation}
+
+Where $f_\theta$ and $g_\theta$ are neural networks parameterized by $\theta$. The world model is trained to minimize the prediction errors:
+
+\begin{equation}
+\mathcal{L}_{\text{world}} = \mathbb{E}_{(s_t, a_t, s_{t+1}, r_t) \sim \mathcal{D}}\Big[\|f_\theta(s_t, a_t) - s_{t+1}\|^2 + \lambda_r\|g_\theta(s_t, a_t, s_{t+1}) - r_t\|^2\Big]
+\end{equation}
+
+Where $\mathcal{D}$ is the replay buffer and $\lambda_r$ is a reward weight hyperparameter.
+
+\subsubsection{Model Predictive Control}
+
+The planning procedure uses a learned actor network to propose actions, which are then perturbed with Gaussian noise controlled by a temperature parameter $\tau$. For a state $s_t$, we generate $N$ action sequences over horizon $H$:
+
+\begin{equation}
+a_{t:t+H-1}^{(i)} = \{\tilde{a}_t^{(i)}, \tilde{a}_{t+1}^{(i)}, \ldots, \tilde{a}_{t+H-1}^{(i)}\}, \quad i = 1, \ldots, N
+\end{equation}
+
+Where each action is sampled as:
+
+\begin{equation}
+\tilde{a}_t^{(i)} = \text{clip}\Big(\pi_\phi(s_t, o_t) + \epsilon^{(i)}, a_{\text{low}}, a_{\text{high}}\Big), \quad \epsilon^{(i)} \sim \mathcal{N}(0, \tau^2 I)
+\end{equation}
+
+Here, $\pi_\phi$ is the actor network, $o_t$ represents the opponent's action (if available in multi-agent settings), and $\tau$ is the temperature parameter that controls the exploration-exploitation trade-off. The temperature decays over time according to:
+
+\begin{equation}
+\tau_{e+1} = \max(\tau_{\min}, \tau_e \cdot \lambda_\tau)
+\end{equation}
+
+Where $e$ is the episode index, $\tau_{\min}$ is the minimum temperature, and $\lambda_\tau$ is the decay factor.
+
+\subsubsection{Trajectory Evaluation}
+
+Each candidate action sequence is evaluated using a combination of predicted rewards from the world model and a learned value function. For a state $s_t$ and action sequence $a_{t:t+H-1}^{(i)}$, the value is:
+
+\begin{equation}
+V(s_t, a_{t:t+H-1}^{(i)}) = \sum_{k=0}^{H-1} \gamma^k r_{t+k}^{(i)} + \gamma^H V_\psi(s_{t+H}^{(i)})
+\end{equation}
+
+Where $\gamma$ is the discount factor, $r_{t+k}^{(i)}$ is the predicted reward at step $t+k$ for trajectory $i$, and $V_\psi$ is the learned value function parameterized by $\psi$. The best action from the highest-valued trajectory is then selected:
+
+\begin{equation}
+a_t = a_t^{(i^*)}, \quad i^* = \argmax_i V(s_t, a_{t:t+H-1}^{(i)})
+\end{equation}
+
+\subsubsection{Value Function Training}
+
+The value function is trained using temporal difference learning to minimize:
+
+\begin{equation}
+\mathcal{L}_{\text{value}} = \mathbb{E}_{(s_t, a_t, s_{t+1}, r_t) \sim \mathcal{D}}\Big[\|V_\psi(s_t) - (r_t + \gamma(1-d_t)V_\psi(s_{t+1}))\|^2\Big]
+\end{equation}
+
+Where $d_t$ is a binary variable indicating whether the state $s_t$ is terminal.
+
+\subsubsection{Actor Training with Behavioral Cloning}
+
+The actor network is trained using a combination of two objectives: (1) policy improvement through predicted rewards and values, and (2) behavioral cloning to imitate the actions selected by the MPC planner.
+
+The policy improvement objective maximizes the expected return:
+
+\begin{equation}
+\mathcal{L}_{\text{actor}} = -\mathbb{E}_{s_t \sim \mathcal{D}}\Big[r_t^\pi + \gamma V_\psi(s_{t+1}^\pi)\Big]
+\end{equation}
+
+Where $r_t^\pi$ is the predicted reward when taking action $a_t^\pi = \pi_\phi(s_t, o_t)$, and $s_{t+1}^\pi$ is the predicted next state.
+
+The behavioral cloning objective minimizes the mean squared error between the actor's output and the actions selected by MPC:
+
+\begin{equation}
+\mathcal{L}_{\text{BC}} = \mathbb{E}_{s_t \sim \mathcal{D}}\Big[\|\pi_\phi(s_t, o_t) - a_t^{\text{MPC}}(s_t, o_t)\|^2\Big]
+\end{equation}
+
+Where $a_t^{\text{MPC}}(s_t, o_t)$ is the action selected by the MPC planner for state $s_t$ and opponent action $o_t$.
+
+The combined actor objective is:
+
+\begin{equation}
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{actor}} + \alpha \mathcal{L}_{\text{BC}}
+\end{equation}
+
+Where $\alpha$ is a hyperparameter controlling the importance of behavioral cloning.

@@ -1,0 +1,8 @@
+Competing against the Basic-Opponents within the Hockey-Env, our agent algorithms are flexible a
+
+What have we learnt?
+- Important to play against a variety of differently behaving agents to explore all possible states and action pairs and not adapt to a specific opponents playstyle. Thus sampling agents randomly during training, including the weak and strong bot and all our trained agents for self and inter agent play.
+
+
+We realized that the agent's success heavily depends on the variety of experiences and training scenarios it encounters. To truly improve, it needs to learn from diverse game dynamics and transitions while facing opponents with different playstyles. However, due to a bug in our self-play mechanism, most training runs (SAC-vs-SAC, SAC-vs-Rainbow or SAC-vs-TDMPC) were ineffective. The issue was that we failed to mirror the opponent’s state space based on the side they were playing on. As a result, after correcting our mistake for the competition, the SAC agent was only properly trained against the strong bot and ended up exploiting its predictable flaws. The strong bot had a tendency to leave its goal unguarded while aggressively controlling the center of the field. The SAC agent quickly adapted by consistently scoring through angled shots that bounced off the walls into the open goal. During the competition, however, this gap in training became obvious. Other bots that had successfully used self-play after beating the strong bot didn’t fall for these simple tricks and were far better at defending.
+

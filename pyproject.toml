@@ -17,6 +17,7 @@ tensorboard = "^2.18.0"
 tqdm = "^4.67.1"
 torch = "^2.2.0"
 torchrl = "^0.6.0"
+tueplots = "^0.2.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"

@@ -5,11 +5,11 @@ defaults:
 
 agent: 'rainbow_hockey_bot'
 
-episodes: 100
+episodes: 200
 episode_max_steps: 400
 show_figures: True
 hockey : True
 render: False
 env:
   opponent:
-    weak: True
+    weak: False

@@ -1,0 +1,70 @@
+\subsection{Deep Q-learning}
+Q-learning is the process of learning an optimal policy by maximizing the Q-function.
+The Q-function is based on the Value function, which is the expected return G (discounted cumulative reward) of the state s following the policy $\pi$ at time step t.
+$$v_\pi(s) = \nE[G_t| S_t=s]$$
+The value has no notion of actions yet, so we define the Q-function (or action-value function) as the expected return G of the state s and action a pair at time step t.
+$$q_\pi(s,a) = \nE[G_t|S_t=s, A_t = a] \underbrace{=}_{\text{Bellman Equation}} \nE[R_{t+1} + q_\pi(S_{t+1}, A_{t+1})|S_t=s, A_t = a]$$
+The Bellman Equation gives us a good way to define an iterative Q-value function that converges to the optimal Q function as $i\rightarrow \infty$:
+$$Q_{i+1}(s,a) = \nE_{s'}[R_{t+1} + \max_{a'} Q_{i}(s', a')|s,a]$$
+\paragraph{Deep Q-learning} \cite{deep-q} parameterizes the Q-function $Q(s,a;\theta_i)$ as a deep neural network. In typical DL fashion, we use a loss function to optimize the parameters $\theta$:
+$$\cL(\theta_i) = \nE_{s,a}\left[(y_i - Q(s,a;\theta_i))^2\right]$$ where 
+$y_i = \nE_{s'}[R_{t+1} + \max_{a'} Q_{i-1}(s', a')|s,a]$ is the optimization target. 
+Now they define the gradient as:
+$$\nabla_{\theta_i} L_i (\theta_i) = 
+\mathbb{E}_{s, a, s'} 
+\left[ \left( R + \max_{a'} Q(s', a'; \theta_{i-1}) - Q(s, a; \theta_i) \right) 
+\nabla_{\theta_i} Q(s, a; \theta_i) \right]$$
+In practise, we maintain a target network $\tilde\theta$ alongside the policy network, which we update periodically.
+We also approximate the expectation by sampling $s,a,s'$ from an experience replay buffer that stores all previously observed transitions (state, generated action, next state).
+
+\subsubsection{Rainbow}
+Rainbow \cite{Rainbow} combines 6 improvements to the original Deep Q-learning method made over the years into a very powerful Reinforcement Learning agent.\\
+\paragraph{Double Q-learning} \cite{doubleQ} addresses an overestimation bias in Q-learning that results from using the max Q-value as the approximation of the expected maximum.
+Using Double Q-learning reduces overestimation but introduces occasional underestimation.
+The new loss is:
+$$(R_t + Q_t(s_t, \arg\max_{a'}Q_t(s_{t+1},a';\theta);\tilde\theta)  - Q_t(s_t,a_t;\theta))^2 $$
+\paragraph{Prioritized Replay} \cite{PER} improves the sampling strategy from the replay buffer by increasing the sampling likelihood of transitions with high learning potential.
+As a proxy, prioritized experience replay (PER) uses the magnitude of a transition's TD error. So the probability of a transition being samples at time step t is:
+$$p_t \propto | R_{t+1} + \max_{a'} Q(s_{t+1},a';\tilde\theta) - Q(s_t,a_t)|^\omega $$
+where $\omega$ is a hyperparameter that determines the shape of the distribution.
+
+\paragraph{Duelling networks} \cite{dueling} feature two estimators. One for the state-value function (V) and the state-dependent action advantage function (A).
+Both estimators share a feature extraction layer f. The Q-value function is now estimated as:
+$$Q(s,a;\theta) = V(f(s;\theta^F);\theta^V) + A(f(s;\theta^F), a;\theta^F) - \dfrac{\Sigma_{a'}A(f(s;\theta^F), a';\theta^A)}{N_\text{actions}} $$
+
+\paragraph{Multi-step learning} introduces multi-step targets instead of accumulated single rewards.
+The truncated n-step return for $s_t$ is:
+$$R_t^{(n)}=\Sigma_{k=0}^{n-1} R_{t+k+1} $$
+which induces an alternative loss:
+$$(R_t^{(n)} + \arg\max_{a'}Q_t(s_{t+n},a';\tilde\theta)  - Q_t(s_t,a_t;\theta))^2$$
+
+\paragraph{Distributional RL} learns to approximate the distribution of rewards instead of the expected return. \cite{distributionalRL} models that distribution with probability masses on discrete support vectors $z$ with N atoms.
+$$z_i = v_{min} + (i-1)\dfrac{v_{max}-v_{min}}{N_{atoms}-1} $$.
+The probability mass of atom i at time t is $p^i(s_t, a_t; \theta)$ and the goal is to update $\theta$ such that this distribution matches the actual distribution of returns.
+They use the Kullback-Leibler divergence to construct the loss between the target and policy distribution, similar to the previous methods.
+
+\paragraph{Noisy Nets} addresses the limitations of $\epsilon$-greedy strategies by replacing it with the addition of noise. Noisy Nets \cite{NoisyNets} proposed linear layers with parametric noise added to the weights.
+This induced stochasticity can aid efficient exploration.
+The parameters of the noise are learned with gradient descent, along with any other remaining network weights. 
+
+\subsubsection{Normalized advantage function}
+DQN has the problem, that the method is bound to discrete action spaces where maximizing over all actions is feasible.
+But there are many cases where we are dealing with continuous action spaces and that is why in \cite{NAF} the authors introduce a new algorithm called Normalized Advantage function, that is based on Duelling DQN and is able to deal with continuous action spaces.\\
+Recall that in duelling DQN, the Q-function is composed of a value and an advantage function. NAF parameterizes the advantage function $a(s,a)$ as a quadratic function of nonlinear features of the state:
+\begin{align*}
+    x &= f(s;\theta^F)\\
+    Q(s,a;\theta) &= V(x;\theta^V) + A(x, a;\theta^A)\\
+    A(s,a;\theta^A) &= -\frac{1}{2}(\mb a-\mb \mu(x;\theta^{\mu}))^\top \mb P(x;\theta^P)(\mb a-\mb \mu(x;\theta^\mu))
+\end{align*}
+where $P(x;\theta^P)$ is a positive-definite square matrix which is parameterized by $P(x;\theta^P) = L(x;\theta^P)L(x;\theta^P)^\top$ where L is a lower-triangular matrix whose entries come from a linear output layer.\\
+Since Q is quadratic in $a$ the maximum is always given by $\mu(x;\theta^\mu)$.\\
+Since NAF is based on duelling DQN, many of the improvements applied in Rainbow could be used in NAF as well.\\
+
+\subsubsection{Application to Laser Hockey}
+Laser hockey has an 18 dimensional observation space and a 4 dimensional continuous action space.
+The game is also adversarial, which none of the algorithms take into account. 
+But the environment delivers 2 additional rewards, a reward for touching the puck and a reward based on the movement direction of the puck, additionally to the standard reward of distance to the puck and a substantial win reward or loss penalty.\\
+From this additional information, I constructed a compositional loss that simply adds the different rewards in order to lower the impact of the win/loss reward and facilitate learning from truncated games.\\
+I evaluated NAF and Rainbow, both with and without the compositional reward. For time reasons, training was mainly performed against the BasicOpponent.\\
+NAF works naturally with the continuous action space, but Rainbow requires conversion of discrete actions to continuous ones, which is provided by the environment. Not that this restricts the Rainbow agent to one-hot continuous actions meaning it can either turn, shoot, move in x direction or in y direction.
+
